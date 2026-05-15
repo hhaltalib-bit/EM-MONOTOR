@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
 
     const { data: listData } = await gmail.users.messages.list({
       userId: 'me',
-      q: `subject:"RMAN Backup Report" after:${dayStart} before:${windowEnd}`,
+      q: `subject:"RMAN Backup" after:${dayStart} before:${windowEnd}`,
       maxResults: 5,
     })
 

@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { createServiceClient } from '@/lib/supabase/server'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { DbCard } from '@/components/dashboard/DbCard'

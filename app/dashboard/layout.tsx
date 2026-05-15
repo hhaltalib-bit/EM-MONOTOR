@@ -1,13 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { unstable_cache } from 'next/cache'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Topbar } from '@/components/layout/Topbar'
 import { ThresholdProvider } from '@/contexts/ThresholdContext'
 import { DatabaseSummary, DbRegistry } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'
 import { sortDatabases } from '@/lib/utils/sort'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 // Returns the most recent report_date that has data in raid_ts
 async function getLatestReportDate(): Promise<string> {
@@ -25,9 +27,8 @@ async function getLatestReportDate(): Promise<string> {
   }
 }
 
-// Cached for 60 s — all 20 DB queries run in parallel, service client bypasses RLS
-const getCachedSummaries = unstable_cache(
-  async (): Promise<DatabaseSummary[]> => {
+// All 20 DB queries run in parallel, service client bypasses RLS
+async function getSummaries(): Promise<DatabaseSummary[]> {
     try {
       const supabase = createServiceClient()
 
@@ -75,10 +76,7 @@ const getCachedSummaries = unstable_cache(
     } catch {
       return []
     }
-  },
-  ['db-summaries'],
-  { revalidate: 60 }
-)
+}
 
 export default async function DashboardLayout({
   children,
@@ -93,7 +91,7 @@ export default async function DashboardLayout({
   }
 
   const [rawDatabases, reportDate] = await Promise.all([
-    getCachedSummaries(),
+    getSummaries(),
     getLatestReportDate(),
   ])
   const databases = sortDatabases(rawDatabases)

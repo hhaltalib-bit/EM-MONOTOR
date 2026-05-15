@@ -26,7 +26,7 @@ export async function fetchTodayReport(): Promise<{ found: false } | { found: tr
   try {
     const { data: listData } = await gmail.users.messages.list({
       userId: 'me',
-      q: `subject:(TableSpace Report) after:${after} before:${before}`,
+      q: `subject:"FW: TableSpace Report" after:${after} before:${before}`,
       maxResults: 5,
     })
 
