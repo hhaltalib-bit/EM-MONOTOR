@@ -26,12 +26,16 @@ export async function fetchTodayReport(forced = false): Promise<{ found: false }
     ? `subject:"FW: TableSpace Report" newer_than:1d`
     : `subject:"FW: TableSpace Report" after:${after} before:${twoAM}`
 
+  console.log('Gmail query:', q)
+
   try {
     const { data: listData } = await gmail.users.messages.list({
       userId: 'me',
       q,
       maxResults: 5,
     })
+
+    console.log('Messages found:', listData.messages?.length ?? 0)
 
     if (!listData.messages || listData.messages.length === 0) {
       return { found: false }
@@ -45,6 +49,9 @@ export async function fetchTodayReport(forced = false): Promise<{ found: false }
       id: messageId,
       format: 'full',
     })
+
+    const subject = message.payload?.headers?.find(h => h.name === 'Subject')?.value
+    console.log('First message subject:', subject)
 
     // Find HTML attachment or body
     const payload = message.payload
