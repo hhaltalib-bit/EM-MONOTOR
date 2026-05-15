@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
   const skipDateValidation = request.nextUrl.searchParams.get('test') === '1'
 
   const parsed = parseHtmlReport(htmlContent, skipDateValidation)
+  console.log('Parser result:', JSON.stringify({ valid: parsed.valid, reason: (parsed as {reason?: string}).reason, report_date: (parsed as {report_date?: string}).report_date, databases: (parsed as {databases?: unknown[]}).databases?.length }))
 
   if (!parsed.valid) {
     await logIngest({ status: 'skipped', error_message: `Validation failed: ${parsed.reason}` })
@@ -125,7 +126,7 @@ async function logIngest(data: {
 }) {
   try {
     const supabase = createServiceClient()
-    await supabase.from('ingest_log').insert(data)
+    await supabase.from('report_log').insert(data)
   } catch { /* non-critical */ }
 }
 

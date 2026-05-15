@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, reason: 'report_not_found' })
     }
 
-    const ingestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/ingest`
+    const ingestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/ingest${isForced ? '?test=1' : ''}`
     const ingestResponse = await fetch(ingestUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-cron-secret': process.env.CRON_SECRET! },
@@ -82,7 +82,7 @@ async function checkAndSendAlerts(reportDate: string) {
 async function logToDb(status: string, reportDate: string | null, reportTime: string | null, dbsProcessed: number, rowsInserted: number, errorMessage: string) {
   try {
     const supabase = createServiceClient()
-    await supabase.from('ingest_log').insert({ status, report_date: reportDate, report_time: reportTime, databases_processed: dbsProcessed, total_rows_inserted: rowsInserted, error_message: errorMessage })
+    await supabase.from('report_log').insert({ status, report_date: reportDate, report_time: reportTime, databases_processed: dbsProcessed, total_rows_inserted: rowsInserted, error_message: errorMessage })
   } catch { /* non-critical */ }
 }
 
