@@ -18,13 +18,9 @@ export async function fetchTodayReport(forced = false): Promise<{ found: false }
   const auth = getOAuth2Client()
   const gmail = google.gmail({ version: 'v1', auth })
 
-  const today = new Date()
-  const after  = Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / 1000)
-  const twoAM  = Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 2, 30).getTime() / 1000)
-
   const q = forced
     ? `subject:"FW: TableSpace Report" newer_than:1d`
-    : `subject:"FW: TableSpace Report" after:${after} before:${twoAM}`
+    : `subject:"FW: TableSpace Report" newer_than:4h`
 
   console.log('Gmail query:', q)
 
