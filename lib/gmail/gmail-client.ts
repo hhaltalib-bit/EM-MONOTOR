@@ -14,19 +14,22 @@ function getOAuth2Client() {
   return oauth2Client
 }
 
-export async function fetchTodayReport(): Promise<{ found: false } | { found: true; content: string; messageId: string }> {
+export async function fetchTodayReport(forced = false): Promise<{ found: false } | { found: true; content: string; messageId: string }> {
   const auth = getOAuth2Client()
   const gmail = google.gmail({ version: 'v1', auth })
 
   const today = new Date()
-  const todayStr = today.toISOString().split('T')[0].replace(/-/g, '/')
-  const after = Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / 1000)
-  const before = Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 2, 30).getTime() / 1000)
+  const after  = Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / 1000)
+  const twoAM  = Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 2, 30).getTime() / 1000)
+
+  const q = forced
+    ? `subject:"FW: TableSpace Report" newer_than:1d`
+    : `subject:"FW: TableSpace Report" after:${after} before:${twoAM}`
 
   try {
     const { data: listData } = await gmail.users.messages.list({
       userId: 'me',
-      q: `subject:"FW: TableSpace Report" after:${after} before:${before}`,
+      q,
       maxResults: 5,
     })
 

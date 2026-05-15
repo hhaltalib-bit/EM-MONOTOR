@@ -91,7 +91,8 @@ export async function GET(request: NextRequest) {
   }
 
   // ── TEST MODE: ?test=1 reads the local RMAN_BACKUP.html instead of Gmail ──
-  const isTest = new URL(request.url).searchParams.get('test') === '1'
+  const isTest   = new URL(request.url).searchParams.get('test')  === '1'
+  const isForced = new URL(request.url).searchParams.get('force') === '1'
   if (isTest) {
     try {
       const htmlContent = readFileSync(RMAN_TEST_FILE, 'utf-8')
@@ -143,17 +144,21 @@ export async function GET(request: NextRequest) {
     const auth = getOAuth2Client()
     const gmail = google.gmail({ version: 'v1', auth })
 
-    // Window: today 00:00 UTC → 10:00 UTC (= 07:00–13:00 GMT+3, catches 07–08 arrival)
-    const dayStart = Math.floor(
-      new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / 1000
+    // Normal window: 06:00–10:00 UTC (= 09:00–13:00 GMT+3, catches 07–08 arrival)
+    const sixAM = Math.floor(
+      new Date(today.getFullYear(), today.getMonth(), today.getDate(), 6).getTime() / 1000
     )
-    const windowEnd = Math.floor(
+    const tenAM = Math.floor(
       new Date(today.getFullYear(), today.getMonth(), today.getDate(), 10).getTime() / 1000
     )
 
+    const q = isForced
+      ? `subject:"RMAN Backup" newer_than:1d`
+      : `subject:"RMAN Backup" after:${sixAM} before:${tenAM}`
+
     const { data: listData } = await gmail.users.messages.list({
       userId: 'me',
-      q: `subject:"RMAN Backup" after:${dayStart} before:${windowEnd}`,
+      q,
       maxResults: 5,
     })
 

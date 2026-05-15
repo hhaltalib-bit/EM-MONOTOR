@@ -10,8 +10,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const isForced = request.nextUrl.searchParams.get('force') === '1'
+
   try {
-    const result = await fetchTodayReport()
+    const result = await fetchTodayReport(isForced)
 
     if (!result.found) {
       try { await sendMissingReportAlert() } catch (e) { console.error('Missing report email failed:', e) }
