@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\hhalt\\\\OneDrive\\\\Desktop\\\\NOVIX PROJECTS\\\\enterprise monotoring system\\\\EM_MONITOR_CODE\" | Where-Object { $_.Name -ne \"node_modules\" } | Select-Object Name, PSIsContainer)",
+      "PowerShell(npm run *)",
+      "PowerShell(netstat *)",
+      "Bash(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\hhalt\\\\OneDrive\\\\Desktop\\\\NOVIX PROJECTS\\\\enterprise monotoring system\\\\EM_MONITOR_CODE\\\\app\\\\\" -Recurse | Where-Object { !$_.PSIsContainer } | Select-Object FullName)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\hhalt\\\\OneDrive\\\\Desktop\\\\NOVIX PROJECTS\\\\enterprise monotoring system\\\\EM_MONITOR_CODE\\\\lib\\\\\" -Recurse | Where-Object { !$_.PSIsContainer } | Select-Object FullName)"
+    ]
+  }
+}

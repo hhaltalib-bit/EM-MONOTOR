@@ -1,0 +1,41 @@
+
+> ts-monitor@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.88.1:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.2s
+ ✓ Compiled /middleware in 283ms (168 modules)
+ ○ Compiling /api/backup-summary ...
+ ✓ Compiled /api/backup-summary in 763ms (357 modules)
+ GET /api/backup-summary 200 in 2254ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1500ms (739 modules)
+ GET /login 200 in 1917ms
+ ✓ Compiled in 538ms (290 modules)
+ ○ Compiling /api/cron-backup ...
+ ✓ Compiled /api/cron-backup in 749ms (778 modules)
+ GET /api/cron-backup?test=1 200 in 7526ms
+ GET /api/cron-backup?test=1 200 in 5232ms
+ ✓ Compiled in 307ms (290 modules)
+ ✓ Compiled in 108ms (290 modules)
+ ✓ Compiled in 121ms (168 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (101kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (231kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled in 88ms (168 modules)
+ ✓ Compiled in 95ms (168 modules)
+ ✓ Compiled in 192ms (290 modules)
+ ✓ Compiled in 165ms (290 modules)
+ ✓ Compiled in 191ms (290 modules)
+ ✓ Compiled in 102ms (290 modules)
+ ✓ Compiled in 147ms (290 modules)
+ ✓ Compiled in 226ms (290 modules)
+ ✓ Compiled in 172ms (290 modules)
+ ✓ Compiled in 87ms (290 modules)
+ ✓ Compiled in 101ms (290 modules)
+ ✓ Compiled in 104ms (290 modules)
+ ✓ Compiled in 96ms (290 modules)

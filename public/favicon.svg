@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark green rounded square background -->
+  <rect width="32" height="32" rx="7" fill="#0d3020"/>
+  <rect width="32" height="32" rx="7" fill="none" stroke="#1f4d2a" stroke-width="1"/>
+  <!-- ti-database-cog icon (Tabler, 24x24) translated to fit 4px padding inside 32x32 -->
+  <g transform="translate(4,4)" fill="none" stroke="#3fb950" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 6c0 1.657 3.582 3 8 3s8-1.343 8-3s-3.582-3-8-3s-8 1.343-8 3"/>
+    <path d="M4 6v6c0 1.657 3.582 3 8 3c.856 0 1.68-.05 2.454-.144"/>
+    <path d="M20 12v-6"/>
+    <path d="M11.01 19.846a7 7 0 0 1-7.01-6.846"/>
+    <circle cx="19" cy="19" r="2"/>
+    <line x1="19" y1="15.5" x2="19" y2="17"/>
+    <line x1="19" y1="21" x2="19" y2="22.5"/>
+    <line x1="22.03" y1="17.25" x2="20.73" y2="18"/>
+    <line x1="17.27" y1="20" x2="15.97" y2="20.75"/>
+    <line x1="15.97" y1="17.25" x2="17.27" y2="18"/>
+    <line x1="20.73" y1="20" x2="22.03" y2="20.75"/>
+  </g>
+</svg>

@@ -1,0 +1,16 @@
+{
+  "name": "EM MONITOR",
+  "short_name": "EM MONITOR",
+  "description": "Enterprise Database Monitoring System",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#3fb950",
+  "background_color": "#080c14",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
