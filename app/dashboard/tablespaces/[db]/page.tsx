@@ -40,6 +40,7 @@ export default function DbDetailPage() {
   const { warnThreshold, critThreshold } = useThresholds()
 
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [registry, setRegistry] = useState<DbRegistry | null>(null)
   const [tablespaces, setTablespaces] = useState<AnyTablespace[]>([])
   const [growthMap, setGrowthMap] = useState<Map<string, number>>(new Map())
@@ -108,14 +109,35 @@ export default function DbDetailPage() {
   // On mount: resolve registry + latest date via API, then load data
   useEffect(() => {
     async function init() {
-      const res = await fetch(`/api/db-info?db_key=${encodeURIComponent(dbKey)}`)
-      if (!res.ok) { setLoading(false); return }
-      const { registry: reg, latestDate } = await res.json() as { registry: DbRegistry; latestDate: string | null }
+      try {
+        console.log('DB key:', dbKey)
+        const res = await fetch(`/api/db-info?db_key=${encodeURIComponent(dbKey)}`)
+        if (!res.ok) {
+          const text = await res.text()
+          console.log('API error:', res.status, text)
+          setError(`Failed to load database info (${res.status})`)
+          setLoading(false)
+          return
+        }
+        const { registry: reg, latestDate } = await res.json() as { registry: DbRegistry; latestDate: string | null }
+        console.log('Registry:', reg)
+        console.log('Report date:', latestDate)
 
-      setRegistry(reg)
-      const date = latestDate ?? new Date().toISOString().split('T')[0]
-      setReportDate(date)
-      await fetchData(date, reg)
+        if (!reg) {
+          setError(`Database "${dbKey}" not found in registry`)
+          setLoading(false)
+          return
+        }
+
+        setRegistry(reg)
+        const date = latestDate ?? new Date().toISOString().split('T')[0]
+        setReportDate(date)
+        await fetchData(date, reg)
+      } catch (err) {
+        console.error('Init error:', err)
+        setError(String(err))
+        setLoading(false)
+      }
     }
     init()
   }, [dbKey, fetchData])
@@ -170,6 +192,12 @@ export default function DbDetailPage() {
       </div>
 
       <TsFilters search={search} onSearch={setSearch} autNoOnly={autNoOnly} onAutToggle={() => setAutNoOnly(!autNoOnly)} />
+
+      {error && (
+        <div style={{ padding: '16px', color: 'var(--cr)', fontFamily: 'monospace', fontSize: '12px', background: 'var(--crb)', borderBottom: '0.5px solid var(--bdv)' }}>
+          Error: {error}
+        </div>
+      )}
 
       {/* Summary bar */}
       <div style={{ display: 'flex', gap: '8px', padding: '8px 16px', background: 'var(--bg)', borderBottom: '0.5px solid var(--bdv)', alignItems: 'center' }}>

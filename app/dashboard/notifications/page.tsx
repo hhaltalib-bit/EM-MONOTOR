@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { createServiceClient } from '@/lib/supabase/server'
 import { DbRegistry } from '@/types'
 
@@ -8,16 +11,25 @@ interface AlertEntry {
   severity: 'critical' | 'warning'
 }
 
+async function getLatestReportDate(): Promise<string> {
+  try {
+    const supabase = createServiceClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase.from('raid_ts') as any)
+      .select('report_date')
+      .order('report_date', { ascending: false })
+      .limit(1)
+      .single()
+    return data?.report_date ?? new Date().toISOString().split('T')[0]
+  } catch {
+    return new Date().toISOString().split('T')[0]
+  }
+}
+
 async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string }> {
   const supabase = createServiceClient()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: latestRow } = await (supabase.from('raid_ts') as any)
-    .select('report_date')
-    .order('report_date', { ascending: false })
-    .limit(1)
-    .single()
-  const reportDate: string = latestRow?.report_date ?? new Date().toISOString().split('T')[0]
+  const reportDate = await getLatestReportDate()
 
   const { data: registries } = await supabase
     .from('db_registry')
