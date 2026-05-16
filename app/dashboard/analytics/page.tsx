@@ -42,6 +42,7 @@ export default function AnalyticsPage() {
   const [latestDate, setLatestDate] = useState('')
   const [loadingTs, setLoadingTs] = useState(false)
   const [loadingChart, setLoadingChart] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Load all databases via API on mount (bypasses RLS)
   useEffect(() => {
@@ -64,6 +65,7 @@ export default function AnalyticsPage() {
     setSelectedTs('')
     setChartData([])
     setLatestDate('')
+    setSearchQuery('')
 
     fetch(`/api/db-info?db_key=${encodeURIComponent(selectedDb)}`)
       .then(r => r.json())
@@ -117,6 +119,10 @@ export default function AnalyticsPage() {
 
   useEffect(() => { fetchChart() }, [fetchChart])
 
+  const filteredTablespaces = tablespaces.filter(ts =>
+    ts.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   const currentValue = chartData.length > 0 ? chartData[chartData.length - 1].value : 0
   const currentSeverity = getSeverity(currentValue, warnThreshold, critThreshold)
   const sevColor =
@@ -139,6 +145,33 @@ export default function AnalyticsPage() {
               ))}
             </select>
 
+            {/* Search input — filters tablespace dropdown in real-time */}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <i className="ti ti-search" style={{ position: 'absolute', left: '8px', fontSize: '12px', color: 'var(--tx3)', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                placeholder="Search tablespace..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                disabled={!selectedDb}
+                style={{
+                  width: '180px',
+                  background: 'var(--bg2)',
+                  border: '0.5px solid var(--bdv)',
+                  borderRadius: '6px',
+                  padding: '6px 10px 6px 26px',
+                  color: 'var(--txv)',
+                  fontSize: '12px',
+                  fontFamily: 'monospace',
+                  outline: 'none',
+                  opacity: !selectedDb ? 0.5 : 1,
+                  cursor: !selectedDb ? 'not-allowed' : 'text',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'var(--Gv)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'var(--bdv)' }}
+              />
+            </div>
+
             <select
               style={{ ...selectStyle, opacity: loadingTs || tablespaces.length === 0 ? 0.5 : 1 }}
               value={selectedTs}
@@ -147,9 +180,12 @@ export default function AnalyticsPage() {
             >
               {loadingTs && <option value="">Loading tablespaces…</option>}
               {!loadingTs && tablespaces.length === 0 && <option value="">No data available</option>}
-              {tablespaces.map(ts => (
+              {filteredTablespaces.map(ts => (
                 <option key={ts} value={ts}>{ts}</option>
               ))}
+              {!loadingTs && tablespaces.length > 0 && filteredTablespaces.length === 0 && (
+                <option value="" disabled>No match</option>
+              )}
             </select>
 
             <select style={selectStyle} value={selectedRange} onChange={e => setSelectedRange(Number(e.target.value))}>
