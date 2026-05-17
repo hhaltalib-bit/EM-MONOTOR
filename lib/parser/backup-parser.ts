@@ -87,13 +87,11 @@ function parseTableRows(tableHtml: string): string[][] {
   return rows
 }
 
-function calcAgeDays(reportDate: string, startTimeIso: string | null): number {
+function calcAgeDays(startTimeIso: string | null): number {
   if (!startTimeIso) return 0
-  const startDate = new Date(startTimeIso)
-  // Use end-of-report-day as reference so overnight jobs (e.g. 11 PM start)
-  // are measured by hours elapsed, not calendar date boundary.
-  const reportDateTime = new Date(reportDate + 'T23:59:59')
-  const diffMs = Math.abs(reportDateTime.getTime() - startDate.getTime())
+  const startTime = new Date(startTimeIso)
+  const now = new Date()
+  const diffMs = Math.abs(now.getTime() - startTime.getTime())
   return Math.floor(diffMs / (1000 * 60 * 60 * 24))
 }
 
@@ -196,7 +194,7 @@ export async function parseBackupReport(
     const outputGb     = outputGbIdx >= 0 ? normalizeOutputGb(dataRow[outputGbIdx] || '') : null
     const outputDevice = outputDeviceIdx >= 0 ? (dataRow[outputDeviceIdx]?.trim() || null) : null
 
-    const ageDays = calcAgeDays(reportDate, startTimeIso)
+    const ageDays = calcAgeDays(startTimeIso)
     const classification = classify(statusRaw, ageDays)
     const dbName = regMap.get(dbKey) || dbKey
 
