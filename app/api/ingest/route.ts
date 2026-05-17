@@ -1,7 +1,6 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseHtmlReport } from '@/lib/parser/html-parser'
-import { checkAndSendAlerts } from '@/lib/email/alerts'
 import { ParsedStandardRow, ParsedDwhRow } from '@/types'
 
 export async function POST(request: NextRequest) {
@@ -41,10 +40,10 @@ export async function POST(request: NextRequest) {
 
   const { data: registries } = await supabase
     .from('db_registry')
-    .select('db_key, table_name, schema_type')
+    .select('db_key, db_name, table_name, schema_type')
 
   const regMap = new Map(
-    (registries || []).map((r: { db_key: string; table_name: string; schema_type: string }) => [
+    (registries || []).map((r: { db_key: string; db_name: string; table_name: string; schema_type: string }) => [
       r.db_key.toLowerCase(), r,
     ])
   )
@@ -96,19 +95,41 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const ingestStatus = errors.length > 0 && dbsProcessed === 0 ? 'error' : 'success'
   await logIngest({
     report_date: parsed.report_date,
     report_time: parsed.report_time,
-    status: ingestStatus,
+    status: errors.length > 0 && dbsProcessed === 0 ? 'error' : 'success',
     databases_processed: dbsProcessed,
     total_rows_inserted: totalInserted,
     error_message: errors.length > 0 ? errors.join('; ') : null,
     notes: `Ingested ${dbsProcessed} databases, ${totalInserted} rows`,
   })
 
-  if (ingestStatus === 'success' && parsed.report_date) {
-    try { await checkAndSendAlerts(parsed.report_date) } catch (e) { console.error('Alert email failed:', e) }
+  // Count critical/warning tablespaces so the caller (Google Apps Script) can decide on alerts
+  let criticalCount = 0
+  let warningCount = 0
+  const criticalDbs: string[] = []
+
+  if (parsed.report_date && dbsProcessed > 0) {
+    for (const reg of (registries || [])) {
+      const pctField = reg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase.from(reg.table_name) as any)
+        .select(`tablespace_name, ${pctField}`)
+        .eq('report_date', parsed.report_date)
+
+      if (!data?.length) continue
+
+      const crit = (data as Record<string, unknown>[]).filter(r => (r[pctField] as number) >= 90)
+      const warn = (data as Record<string, unknown>[]).filter(r => {
+        const p = r[pctField] as number
+        return p >= 80 && p < 90
+      })
+
+      criticalCount += crit.length
+      warningCount += warn.length
+      if (crit.length > 0) criticalDbs.push(reg.db_name || reg.db_key)
+    }
   }
 
   return NextResponse.json({
@@ -117,6 +138,9 @@ export async function POST(request: NextRequest) {
     report_time: parsed.report_time,
     databases_processed: dbsProcessed,
     total_rows_inserted: totalInserted,
+    critical_count: criticalCount,
+    warning_count: warningCount,
+    critical_dbs: criticalDbs,
     errors: errors.length > 0 ? errors : undefined,
   })
 }
@@ -135,4 +159,3 @@ async function logIngest(data: {
     await supabase.from('report_log').insert(data)
   } catch { /* non-critical */ }
 }
-
