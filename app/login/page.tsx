@@ -3,14 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import OrbitRings from '@/components/OrbitRings'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [isDark, setIsDark]     = useState(false)
   const router = useRouter()
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -40,186 +40,222 @@ export default function LoginPage() {
     }
   }
 
+  const green  = isDark ? '#4ade80' : '#16a34a'
+  const greenDim = isDark ? 'rgba(74,222,128,0.7)' : '#16a34a'
+
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'var(--bg)',
-        display: 'flex',
-        fontFamily: 'system-ui, sans-serif',
-        animation: 'pgFade 0.3s',
-      }}
-    >
-      {/* LEFT SIDE: Branding */}
-      <div
-        style={{
-          flex: 1,
-          position: 'relative',
-          overflow: 'hidden',
-          background: '#ffffff',
-          animation: 'slideUp 0.5s ease-out both',
-        }}
-      >
-        {/* Green grid background */}
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      fontFamily: 'system-ui, sans-serif',
+      animation: 'pgFade 0.3s',
+    }}>
+
+      {/* ── LEFT PANEL ──────────────────────────────────────── */}
+      <div style={{
+        flex: 1,
+        background: isDark ? '#040C08' : '#F7FDF9',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+
+        {/* Grid */}
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage: `
-            linear-gradient(rgba(22,163,74,0.06) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(22,163,74,0.06) 1px, transparent 1px)
+            linear-gradient(rgba(22,163,74,${isDark ? '0.08' : '0.07'}) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(22,163,74,${isDark ? '0.08' : '0.07'}) 1px, transparent 1px)
           `,
-          backgroundSize: '28px 28px',
+          backgroundSize: '32px 32px',
           pointerEvents: 'none',
-          zIndex: 0,
         }}/>
 
-        {/* Left fade for text readability */}
+        {/* Scanline */}
         <div style={{
-          position: 'absolute', inset: 0,
-          background: 'radial-gradient(ellipse at 20% 50%, rgba(255,255,255,0.95) 30%, transparent 75%)',
-          pointerEvents: 'none',
-          zIndex: 0,
+          position: 'absolute', left: 0, right: 0, height: '2px',
+          background: `linear-gradient(90deg, transparent, rgba(22,163,74,${isDark ? '0.2' : '0.15'}), transparent)`,
+          animation: 'em-scanline 5s linear infinite',
+          pointerEvents: 'none', zIndex: 1,
         }}/>
 
-        {/* Green orb top-right */}
+        {/* Orb top-right */}
         <div style={{
-          position: 'absolute', right: '-60px', top: '-60px',
-          width: '320px', height: '320px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(22,163,74,0.12) 0%, transparent 65%)',
+          position: 'absolute', top: '-80px', right: '-80px',
+          width: '300px', height: '300px', borderRadius: '50%',
+          background: `radial-gradient(circle, rgba(22,163,74,${isDark ? '0.18' : '0.12'}) 0%, transparent 65%)`,
+          animation: 'em-glow 3s ease-in-out infinite',
           pointerEvents: 'none',
-          zIndex: 0,
         }}/>
 
-        {/* Blue orb bottom-right */}
+        {/* Orb bottom-left */}
         <div style={{
-          position: 'absolute', right: '80px', bottom: '-80px',
+          position: 'absolute', bottom: '-60px', left: '-60px',
           width: '200px', height: '200px', borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(14,165,233,0.08) 0%, transparent 65%)',
+          animation: 'em-glow 4s ease-in-out infinite 1s',
           pointerEvents: 'none',
-          zIndex: 0,
         }}/>
 
-        {/* Content */}
+        {/* SVG flow lines */}
+        <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}
+          viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="em-lg" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%"   stopColor="rgba(22,163,74,0)"/>
+              <stop offset="50%"  stopColor={isDark ? 'rgba(22,163,74,0.35)' : 'rgba(22,163,74,0.2)'}/>
+              <stop offset="100%" stopColor="rgba(22,163,74,0)"/>
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="150" x2="400" y2="150" stroke="rgba(22,163,74,0.07)" strokeWidth="1"/>
+          <line x1="0" y1="300" x2="400" y2="300" stroke="rgba(22,163,74,0.06)" strokeWidth="1"/>
+          <line x1="0" y1="450" x2="400" y2="450" stroke="rgba(22,163,74,0.05)" strokeWidth="1"/>
+          <line x1="200" y1="0"  x2="200" y2="600" stroke="rgba(22,163,74,0.06)" strokeWidth="1"/>
+          <line x1="0" y1="200" x2="400" y2="200" stroke="url(#em-lg)" strokeWidth="1.5"
+            strokeDasharray="80 120" style={{ animation: 'em-stream 3s linear infinite' }}/>
+          <line x1="400" y1="380" x2="0" y2="380" stroke="url(#em-lg)" strokeWidth="1"
+            strokeDasharray="60 140" style={{ animation: 'em-stream 4s linear infinite 1.5s' }}/>
+        </svg>
+
+        {/* Orbit rings — centered */}
+        <OrbitRings dark={isDark} />
+
+        {/* Floating card — top-left */}
         <div style={{
-          position: 'relative',
-          zIndex: 2,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          height: '100%',
-          padding: '48px 44px',
+          position: 'absolute', top: '44px', left: '16px',
+          background: isDark ? 'rgba(4,12,8,0.85)' : '#ffffff',
+          border: `0.5px solid rgba(22,163,74,${isDark ? '0.35' : '0.25'})`,
+          borderRadius: '10px', padding: '10px 13px',
+          animation: 'em-float-a 3.5s ease-in-out infinite',
+          backdropFilter: isDark ? 'blur(6px)' : 'none',
+          boxShadow: isDark ? 'none' : '0 4px 14px rgba(22,163,74,0.08)',
         }}>
-          {/* Logo + product name */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '11px', marginBottom: '44px' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                background: 'rgba(22,163,74,0.1)',
-                border: '0.5px solid #16a34a',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <i className="ti ti-database-cog" style={{ color: '#16a34a', fontSize: '19px' }} />
-            </div>
-            <div>
-              <div style={{ fontSize: '17px', fontWeight: 500, color: '#111827' }}>EM MONITOR</div>
-              <div style={{ fontSize: '10px', color: '#16a34a', fontFamily: 'monospace', marginTop: '1px' }}>
-                Enterprise Edition
-              </div>
-            </div>
-          </div>
-
-          {/* Main heading */}
-          <div
-            style={{
-              fontSize: '26px',
-              fontWeight: 500,
-              color: '#111827',
-              marginBottom: '8px',
-              letterSpacing: '-0.5px',
-              lineHeight: 1.2,
-            }}
-          >
-            Complete Oracle<br />Tablespace Monitoring
-          </div>
-
-          {/* Subtitle */}
-          <div
-            style={{
-              fontSize: '13px',
-              color: '#6b7280',
-              marginBottom: '36px',
-              lineHeight: 1.7,
-            }}
-          >
-            Real-time visibility into your entire<br />database fleet — all in one place.
-          </div>
-
-          {/* Feature list */}
-          {[
-            { icon: 'ti-activity-heartbeat', text: 'Live monitoring across 20+ databases' },
-            { icon: 'ti-bell-ringing',        text: 'Instant alerts for critical tablespaces' },
-            { icon: 'ti-chart-area-line',     text: '30-day growth trend analytics' },
-            { icon: 'ti-shield-check',        text: 'Secure multi-user access control' },
-          ].map((item) => (
-            <div
-              key={item.icon}
-              style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '13px' }}
-            >
-              <i
-                className={`ti ${item.icon}`}
-                style={{ fontSize: '16px', color: '#16a34a', flexShrink: 0 }}
-              />
-              <span style={{ fontSize: '12px', color: '#6b7280' }}>{item.text}</span>
-            </div>
-          ))}
+          <i className="ti ti-eye" style={{ fontSize:'14px', color: green }}/>
+          <div style={{ fontSize:'13px', fontWeight:500, color: isDark ? '#fff' : '#111', marginTop:'4px' }}>Real-time</div>
+          <div style={{ fontSize:'10px', color: greenDim, fontFamily:'monospace' }}>Live monitoring</div>
         </div>
 
-        {/* Orbit Rings — sits at right-center of left panel */}
-        <OrbitRings />
+        {/* Floating card — top-right */}
+        <div style={{
+          position: 'absolute', top: '44px', right: '16px',
+          background: isDark ? 'rgba(4,12,8,0.85)' : '#ffffff',
+          border: `0.5px solid rgba(22,163,74,${isDark ? '0.35' : '0.25'})`,
+          borderRadius: '10px', padding: '10px 13px',
+          animation: 'em-float-b 4s ease-in-out infinite 0.8s',
+          backdropFilter: isDark ? 'blur(6px)' : 'none',
+          boxShadow: isDark ? 'none' : '0 4px 14px rgba(22,163,74,0.08)',
+        }}>
+          <i className="ti ti-bell-ringing" style={{ fontSize:'14px', color: green }}/>
+          <div style={{ fontSize:'13px', fontWeight:500, color: isDark ? '#fff' : '#111', marginTop:'4px' }}>Auto Alert</div>
+          <div style={{ fontSize:'10px', color: greenDim, fontFamily:'monospace' }}>Email &amp; notify</div>
+        </div>
+
+        {/* Floating card — bottom-left */}
+        <div style={{
+          position: 'absolute', bottom: '44px', left: '16px',
+          background: isDark ? 'rgba(4,12,8,0.85)' : '#ffffff',
+          border: `0.5px solid rgba(22,163,74,${isDark ? '0.35' : '0.25'})`,
+          borderRadius: '10px', padding: '10px 13px',
+          animation: 'em-float-c 3s ease-in-out infinite 1.2s',
+          backdropFilter: isDark ? 'blur(6px)' : 'none',
+          boxShadow: isDark ? 'none' : '0 4px 14px rgba(22,163,74,0.08)',
+        }}>
+          <i className="ti ti-mail-forward" style={{ fontSize:'14px', color: green }}/>
+          <div style={{ fontSize:'13px', fontWeight:500, color: isDark ? '#fff' : '#111', marginTop:'4px' }}>Auto Ingest</div>
+          <div style={{ fontSize:'10px', color: greenDim, fontFamily:'monospace' }}>Gmail → System</div>
+        </div>
+
+        {/* Floating card — bottom-right */}
+        <div style={{
+          position: 'absolute', bottom: '44px', right: '16px',
+          background: isDark ? 'rgba(4,12,8,0.85)' : '#ffffff',
+          border: `0.5px solid rgba(22,163,74,${isDark ? '0.35' : '0.25'})`,
+          borderRadius: '10px', padding: '10px 13px',
+          animation: 'em-float-a 3.8s ease-in-out infinite 0.4s',
+          backdropFilter: isDark ? 'blur(6px)' : 'none',
+          boxShadow: isDark ? 'none' : '0 4px 14px rgba(22,163,74,0.08)',
+        }}>
+          <i className="ti ti-chart-line" style={{ fontSize:'14px', color: green }}/>
+          <div style={{ fontSize:'13px', fontWeight:500, color: isDark ? '#fff' : '#111', marginTop:'4px' }}>30-day</div>
+          <div style={{ fontSize:'10px', color: greenDim, fontFamily:'monospace' }}>Growth trends</div>
+        </div>
+
+        {/* Terminal line */}
+        <div style={{
+          position: 'absolute', bottom: '14px', left: '16px', right: '16px',
+          fontSize: '10px', color: 'rgba(22,163,74,0.55)',
+          fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '6px',
+        }}>
+          <span style={{ color: isDark ? 'rgba(22,163,74,0.8)' : '#16a34a' }}>›</span>
+          <span>system.status = OPERATIONAL</span>
+          <span style={{ animation: 'em-blink 1s step-end infinite' }}>_</span>
+        </div>
+
+        {/* All animations */}
+        <style>{`
+          @keyframes em-scanline  { 0%     { top: -2px;   } 100%      { top: 100%;       } }
+          @keyframes em-glow      { 0%,100%{ opacity:.6;  } 50%       { opacity:1;        } }
+          @keyframes em-stream    { 0%     { stroke-dashoffset:200; } 100% { stroke-dashoffset:0; } }
+          @keyframes em-float-a   { 0%,100%{ transform:translateY(0);  } 50% { transform:translateY(-6px); } }
+          @keyframes em-float-b   { 0%,100%{ transform:translateY(0);  } 50% { transform:translateY(-5px); } }
+          @keyframes em-float-c   { 0%,100%{ transform:translateY(0);  } 50% { transform:translateY(-4px); } }
+          @keyframes em-blink     { 0%,100%{ opacity:1; } 50% { opacity:0; } }
+          @keyframes pgFade       { from { opacity:0; } to { opacity:1; } }
+          @keyframes slideUp      { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+        `}</style>
       </div>
 
-      {/* RIGHT SIDE: Login form */}
-      <div
-        style={{
-          width: '310px',
-          background: 'var(--bg3)',
-          borderLeft: '0.5px solid var(--bdv)',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '32px',
-          animation: 'slideUp 0.5s 0.1s ease-out both',
-        }}
-      >
-        {/* Theme toggle — top right */}
+      {/* ── RIGHT PANEL (login form) ─────────────────────────── */}
+      <div style={{
+        width: '310px',
+        background: isDark ? '#0A0F0B' : '#ffffff',
+        borderLeft: `0.5px solid rgba(22,163,74,${isDark ? '0.15' : '0.15'})`,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '32px',
+        animation: 'slideUp 0.5s 0.1s ease-out both',
+      }}>
+
+        {/* Theme toggle */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '28px' }}>
-          <ThemeToggle />
+          <button
+            onClick={() => setIsDark(d => !d)}
+            style={{
+              background: 'none',
+              border: `1px solid rgba(22,163,74,${isDark ? '0.3' : '0.25'})`,
+              borderRadius: '6px',
+              padding: '5px 11px',
+              cursor: 'pointer',
+              color: isDark ? '#4ade80' : '#16a34a',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              letterSpacing: '0.03em',
+            }}
+          >
+            {isDark ? '☀ Light' : '◑ Dark'}
+          </button>
         </div>
 
         {/* Welcome text */}
         <div style={{ marginBottom: '26px' }}>
-          <div style={{ fontSize: '20px', fontWeight: 500, color: 'var(--txv)', marginBottom: '5px', letterSpacing: '-0.3px' }}>
+          <div style={{ fontSize: '20px', fontWeight: 500, color: isDark ? '#ffffff' : '#111827', marginBottom: '5px', letterSpacing: '-0.3px' }}>
             Welcome back
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--tx2)' }}>Sign in to your dashboard</div>
+          <div style={{ fontSize: '13px', color: isDark ? '#666666' : '#6b7280' }}>
+            Sign in to your dashboard
+          </div>
         </div>
 
         <form onSubmit={handleSignIn}>
           {/* Username */}
           <div style={{ marginBottom: '13px' }}>
-            <div
-              style={{
-                fontSize: '10px',
-                color: 'var(--tx3)',
-                marginBottom: '6px',
-                fontFamily: 'monospace',
-                textTransform: 'uppercase',
-                letterSpacing: '0.6px',
-              }}
-            >
+            <div style={{
+              fontSize: '10px',
+              color: isDark ? '#555555' : '#9ca3af',
+              marginBottom: '6px',
+              fontFamily: 'monospace',
+              textTransform: 'uppercase',
+              letterSpacing: '0.6px',
+            }}>
               Username
             </div>
             <input
@@ -228,21 +264,30 @@ export default function LoginPage() {
               placeholder="Enter username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              style={isDark ? {
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#888888',
+                borderRadius: '8px',
+                padding: '9px 12px',
+                width: '100%',
+                fontSize: '13px',
+                outline: 'none',
+                boxSizing: 'border-box',
+              } : undefined}
             />
           </div>
 
           {/* Password */}
           <div style={{ marginBottom: '6px' }}>
-            <div
-              style={{
-                fontSize: '10px',
-                color: 'var(--tx3)',
-                marginBottom: '6px',
-                fontFamily: 'monospace',
-                textTransform: 'uppercase',
-                letterSpacing: '0.6px',
-              }}
-            >
+            <div style={{
+              fontSize: '10px',
+              color: isDark ? '#555555' : '#9ca3af',
+              marginBottom: '6px',
+              fontFamily: 'monospace',
+              textTransform: 'uppercase',
+              letterSpacing: '0.6px',
+            }}>
               Password
             </div>
             <input
@@ -251,24 +296,33 @@ export default function LoginPage() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              style={isDark ? {
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#888888',
+                borderRadius: '8px',
+                padding: '9px 12px',
+                width: '100%',
+                fontSize: '13px',
+                outline: 'none',
+                boxSizing: 'border-box',
+              } : undefined}
             />
           </div>
 
-          {/* Error message */}
+          {/* Error */}
           {error && (
-            <div
-              style={{
-                color: 'var(--cr)',
-                fontSize: '11px',
-                padding: '8px 12px',
-                background: 'var(--crb)',
-                border: '0.5px solid var(--cr)',
-                borderRadius: '6px',
-                marginBottom: '10px',
-                marginTop: '8px',
-                animation: 'slideUp 0.2s',
-              }}
-            >
+            <div style={{
+              color: '#f85149',
+              fontSize: '11px',
+              padding: '8px 12px',
+              background: 'rgba(248,81,73,0.1)',
+              border: '0.5px solid #f85149',
+              borderRadius: '6px',
+              marginBottom: '10px',
+              marginTop: '8px',
+              animation: 'slideUp 0.2s',
+            }}>
               {error}
             </div>
           )}
@@ -279,8 +333,8 @@ export default function LoginPage() {
             disabled={loading}
             style={{
               width: '100%',
-              background: 'var(--Gv)',
-              color: '#080c14',
+              background: '#16a34a',
+              color: '#ffffff',
               border: 'none',
               borderRadius: '8px',
               padding: '11px',
@@ -290,6 +344,7 @@ export default function LoginPage() {
               marginTop: '14px',
               opacity: loading ? 0.7 : 1,
               transition: 'opacity 0.15s',
+              boxShadow: isDark ? '0 0 20px rgba(22,163,74,0.3)' : 'none',
             }}
           >
             {loading ? 'Signing in...' : 'Sign in to Dashboard →'}
@@ -297,15 +352,13 @@ export default function LoginPage() {
         </form>
 
         {/* Demo hint */}
-        <div
-          style={{
-            textAlign: 'center',
-            marginTop: '20px',
-            fontSize: '10px',
-            color: 'var(--tx3)',
-            fontFamily: 'monospace',
-          }}
-        >
+        <div style={{
+          textAlign: 'center',
+          marginTop: '20px',
+          fontSize: '10px',
+          color: isDark ? '#333333' : '#d1d5db',
+          fontFamily: 'monospace',
+        }}>
           demo mode · any credentials
         </div>
       </div>
