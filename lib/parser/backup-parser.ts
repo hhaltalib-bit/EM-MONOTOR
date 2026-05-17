@@ -89,22 +89,22 @@ function parseTableRows(tableHtml: string): string[][] {
 
 function calcAgeDays(reportDate: string, startTimeIso: string | null): number {
   if (!startTimeIso) return 0
-  const report = new Date(reportDate)
-  const start = new Date(startTimeIso)
-  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate())
-  const reportDay = new Date(report.getFullYear(), report.getMonth(), report.getDate())
-  const diff = Math.floor((reportDay.getTime() - startDay.getTime()) / 86400000)
-  return Math.max(0, diff)
+  const startDate = new Date(startTimeIso)
+  // Use end-of-report-day as reference so overnight jobs (e.g. 11 PM start)
+  // are measured by hours elapsed, not calendar date boundary.
+  const reportDateTime = new Date(reportDate + 'T23:59:59')
+  const diffMs = Math.abs(reportDateTime.getTime() - startDate.getTime())
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24))
 }
 
 function classify(
   status: string | null,
   ageDays: number,
 ): 'healthy' | 'delayed' | 'failed' | 'ignored' {
-  if (status === 'FAILED') return 'failed'
-  if (ageDays === 0) return 'healthy'
-  if (ageDays <= 89) return 'delayed'
-  return 'ignored'
+  if (status?.includes('FAILED')) return 'failed'
+  if (ageDays > 90) return 'ignored'
+  if (ageDays >= 1) return 'delayed'
+  return 'healthy'
 }
 
 // Convert output size — handles bytes, MB, or GB depending on scale
