@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseHtmlReport } from '@/lib/parser/html-parser'
+import { checkAndSendAlerts } from '@/lib/email/alerts'
 import { ParsedStandardRow, ParsedDwhRow } from '@/types'
 
 export async function POST(request: NextRequest) {
@@ -95,15 +96,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const ingestStatus = errors.length > 0 && dbsProcessed === 0 ? 'error' : 'success'
   await logIngest({
     report_date: parsed.report_date,
     report_time: parsed.report_time,
-    status: errors.length > 0 && dbsProcessed === 0 ? 'error' : 'success',
+    status: ingestStatus,
     databases_processed: dbsProcessed,
     total_rows_inserted: totalInserted,
     error_message: errors.length > 0 ? errors.join('; ') : null,
     notes: `Ingested ${dbsProcessed} databases, ${totalInserted} rows`,
   })
+
+  if (ingestStatus === 'success' && parsed.report_date) {
+    try { await checkAndSendAlerts(parsed.report_date) } catch (e) { console.error('Alert email failed:', e) }
+  }
 
   return NextResponse.json({
     success: true,

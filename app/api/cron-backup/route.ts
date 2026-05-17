@@ -4,6 +4,7 @@ import { Resend } from 'resend'
 import { readFileSync } from 'fs'
 import { parseBackupReport } from '@/lib/parser/backup-parser'
 import { createServiceClient } from '@/lib/supabase/server'
+import { sendBackupStatusAlert } from '@/lib/email/alerts'
 
 const RMAN_TEST_FILE = 'C:\\Users\\hhalt\\OneDrive\\Desktop\\NOVIX PROJECTS\\enterprise monotoring system\\RMAN_BACKUP.html'
 const RMAN_TEST_DATE = '2026-05-14'
@@ -60,6 +61,8 @@ async function logBackupReport(
 
 async function sendMissingBackupAlert(reportDate: string) {
   const resend = new Resend(process.env.RESEND_API_KEY)
+  console.log('Sending alert to:', process.env.ALERT_EMAIL_TO)
+  console.log('From:', process.env.ALERT_EMAIL_FROM)
   await resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
     to:   process.env.ALERT_EMAIL_TO   || 'hassan.haider@onyxes.com',
@@ -189,6 +192,17 @@ export async function GET(request: NextRequest) {
       result.ignoredCount,
       null,
     )
+
+    if (result.failedCount > 0 || result.delayedCount > 0) {
+      try {
+        await sendBackupStatusAlert({
+          report_date: reportDate,
+          failed_count: result.failedCount,
+          delayed_count: result.delayedCount,
+          databases_count: result.databasesCount,
+        })
+      } catch (e) { console.error('Backup alert email failed:', e) }
+    }
 
     return NextResponse.json({
       success: true,

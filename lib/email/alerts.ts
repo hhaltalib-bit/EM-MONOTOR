@@ -1,4 +1,6 @@
 import { Resend } from 'resend'
+import { createServiceClient } from '@/lib/supabase/server'
+import { DbRegistry } from '@/types'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -84,6 +86,8 @@ export async function sendCriticalAlert(data: CriticalAlertData) {
     </div>
   `
 
+  console.log('Sending alert to:', process.env.ALERT_EMAIL_TO)
+  console.log('From:', process.env.ALERT_EMAIL_FROM)
   await resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
     to: process.env.ALERT_EMAIL_TO || 'hassan.haider@onyxes.com',
@@ -116,10 +120,100 @@ export async function sendMissingReportAlert() {
     </div>
   `
 
+  console.log('Sending alert to:', process.env.ALERT_EMAIL_TO)
+  console.log('From:', process.env.ALERT_EMAIL_FROM)
   await resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
     to: process.env.ALERT_EMAIL_TO || 'hassan.haider@onyxes.com',
     subject,
     html,
   })
+}
+
+export async function sendBackupStatusAlert(data: {
+  report_date: string
+  failed_count: number
+  delayed_count: number
+  databases_count: number
+}) {
+  const subject = `⚠️ EM MONITOR: RMAN Backup Issues — ${data.report_date} (${data.failed_count} failed, ${data.delayed_count} delayed)`
+
+  const html = `
+    <div style="font-family:system-ui,sans-serif;background:#080c14;color:#c9d1d9;padding:24px;max-width:600px;">
+      <h1 style="font-size:20px;font-weight:500;color:#d29922;margin:0 0 8px;">RMAN Backup Alert</h1>
+      <p style="color:#8b949e;margin:0 0 16px;font-size:13px;">${data.report_date}</p>
+
+      <div style="background:#391e05;border:0.5px solid #d29922;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+        <p style="margin:0;font-size:13px;color:#d29922;">
+          Backup report received but issues detected across ${data.databases_count} databases.
+        </p>
+      </div>
+
+      <div style="background:#0e1421;border:0.5px solid #1a2640;border-radius:8px;padding:12px 16px;">
+        <p style="margin:0 0 6px;font-size:13px;">
+          <span style="font-family:monospace;color:#f85149;font-size:16px;font-weight:500;">${data.failed_count}</span>
+          <span style="color:#8b949e;margin-left:6px;">failed</span>
+        </p>
+        <p style="margin:0;font-size:13px;">
+          <span style="font-family:monospace;color:#d29922;font-size:16px;font-weight:500;">${data.delayed_count}</span>
+          <span style="color:#8b949e;margin-left:6px;">delayed</span>
+        </p>
+      </div>
+
+      <p style="font-size:11px;color:#3d5068;font-family:monospace;margin-top:20px;">
+        EM MONITOR Enterprise · Automated Alert
+      </p>
+    </div>
+  `
+
+  console.log('Sending alert to:', process.env.ALERT_EMAIL_TO)
+  console.log('From:', process.env.ALERT_EMAIL_FROM)
+  await resend.emails.send({
+    from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
+    to: process.env.ALERT_EMAIL_TO || 'hassan.haider@onyxes.com',
+    subject,
+    html,
+  })
+}
+
+export async function checkAndSendAlerts(reportDate: string) {
+  const supabase = createServiceClient()
+  const { data: registries } = await supabase.from('db_registry').select('*').eq('is_active', true)
+  if (!registries) return
+
+  let criticalTotal = 0
+  let warningTotal = 0
+  const dbBreakdown: Array<{
+    name: string
+    critical_count: number
+    warning_count: number
+    critical_tablespaces: Array<{ name: string; pct: number }>
+  }> = []
+
+  for (const reg of registries as DbRegistry[]) {
+    const pctField = reg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase.from(reg.table_name) as any)
+      .select(`tablespace_name, ${pctField}`)
+      .eq('report_date', reportDate)
+
+    if (!data) continue
+
+    const criticalTs = (data as Record<string, unknown>[])
+      .filter(r => (r[pctField] as number) >= 90)
+      .map(r => ({ name: r.tablespace_name as string, pct: r[pctField] as number }))
+
+    const warningCount = (data as Record<string, unknown>[])
+      .filter(r => { const p = r[pctField] as number; return p >= 80 && p < 90 }).length
+
+    if (criticalTs.length > 0 || warningCount > 0) {
+      criticalTotal += criticalTs.length
+      warningTotal += warningCount
+      dbBreakdown.push({ name: reg.db_name, critical_count: criticalTs.length, warning_count: warningCount, critical_tablespaces: criticalTs })
+    }
+  }
+
+  if (criticalTotal > 0 || warningTotal > 0) {
+    await sendCriticalAlert({ report_date: reportDate, critical_total: criticalTotal, warning_total: warningTotal, databases: dbBreakdown })
+  }
 }
