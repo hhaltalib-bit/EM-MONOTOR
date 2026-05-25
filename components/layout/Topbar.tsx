@@ -9,6 +9,7 @@ interface TopbarProps {
   userInitials?: string
   notificationCount?: number
   reportTime?: string | null
+  backupReportTime?: string | null
   toast?: ToastMessage | null
 }
 
@@ -25,6 +26,7 @@ export function Topbar({
   userInitials = 'HH',
   notificationCount = 0,
   reportTime = null,
+  backupReportTime: _backupReportTime = null,
   toast = null,
 }: TopbarProps) {
   const pathname = usePathname()

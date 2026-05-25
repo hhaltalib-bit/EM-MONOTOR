@@ -27,6 +27,22 @@ async function getLatestReportDate(): Promise<string> {
   }
 }
 
+// Returns the most recent report_date from backup_status
+async function getLatestBackupDate(): Promise<string | null> {
+  try {
+    const supabase = createServiceClient()
+    const { data } = await supabase
+      .from('backup_status')
+      .select('report_date')
+      .order('report_date', { ascending: false })
+      .limit(1)
+      .single()
+    return data?.report_date ?? null
+  } catch {
+    return null
+  }
+}
+
 // All 20 DB queries run in parallel, service client bypasses RLS
 async function getSummaries(): Promise<DatabaseSummary[]> {
     try {
@@ -90,9 +106,10 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  const [rawDatabases, reportDate] = await Promise.all([
+  const [rawDatabases, tablespaceDate, backupDate] = await Promise.all([
     getSummaries(),
     getLatestReportDate(),
+    getLatestBackupDate(),
   ])
   const databases = sortDatabases(rawDatabases)
 
@@ -113,7 +130,8 @@ export default async function DashboardLayout({
           <Topbar
             userInitials={userInitials}
             notificationCount={notificationCount}
-            reportTime={reportDate}
+            reportTime={tablespaceDate}
+            backupReportTime={backupDate}
           />
           <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg)' }} className="page-content">
             {children}

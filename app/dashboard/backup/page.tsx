@@ -216,8 +216,6 @@ export default function BackupPage() {
 
   const counts = [healthy.length, delayed.length, failed.length, ignored.length]
 
-  const reportTimeStr = fmtTime(data.reportInfo?.receivedAt ?? null)
-
   // Healthy: show first 6, rest in footer
   const LIMIT = 6
   const healthyShow = healthy.slice(0, LIMIT)
@@ -237,15 +235,15 @@ export default function BackupPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-          {/* Backup report pill */}
-          {reportTimeStr ? (
+          {/* Backup report date pill */}
+          {data.latestDate ? (
             <div style={{
               display: 'flex', alignItems: 'center', gap: '4px',
               background: GB, border: `0.5px solid ${G}`,
               borderRadius: '5px', padding: '3px 9px', fontSize: '11px', color: G,
             }}>
               <i className="ti ti-circle-check" style={{ fontSize: '11px' }} />
-              <span style={{ fontFamily: 'monospace' }}>Backup · {reportTimeStr}</span>
+              <span style={{ fontFamily: 'monospace' }}>Backup · {data.latestDate}</span>
             </div>
           ) : (
             <div style={{
