@@ -30,7 +30,8 @@ export function Sparkline({ data, severity }: SparklineProps) {
 
   const min = Math.min(...data)
   const max = Math.max(...data)
-  const range = max - min || 1
+  const MIN_VISUAL_RANGE = 2
+  const range = Math.max(max - min, MIN_VISUAL_RANGE)
 
   const points = data.map((v, i) => {
     const x = (i / (data.length - 1)) * W

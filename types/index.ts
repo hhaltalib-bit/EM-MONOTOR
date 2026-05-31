@@ -79,12 +79,6 @@ export interface GrowthResult {
   growth_gb: number
 }
 
-// Sparkline data point
-export interface SparklinePoint {
-  report_date: string
-  value: number
-}
-
 // Toast types
 export type ToastType = 'ok' | 'wa' | 'cr'
 

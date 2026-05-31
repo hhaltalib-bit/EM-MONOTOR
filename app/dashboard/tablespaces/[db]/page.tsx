@@ -62,41 +62,6 @@ export default function DbDetailPage() {
     const { data: todayData } = await tb.select('*').eq('report_date', date)
     if (!todayData) { setLoading(false); return }
 
-    const { data: prevDateRow } = await tb
-      .select('report_date')
-      .lt('report_date', date)
-      .order('report_date', { ascending: false })
-      .limit(1)
-      .single()
-
-    const prevDate = prevDateRow?.report_date ?? null
-
-    if (!prevDate) {
-      setGrowthMap(new Map())
-      setLoading(false)
-      return
-    }
-
-    const { data: prevData } = await tb
-      .select(`tablespace_name, ${usedField}`)
-      .eq('report_date', prevDate)
-
-    const prevMap = new Map(
-      ((prevData || []) as Record<string, unknown>[]).map(r => [
-        r.tablespace_name as string,
-        r[usedField] as number,
-      ])
-    )
-
-    const gMap = new Map<string, number>()
-    for (const ts of (todayData as Record<string, unknown>[])) {
-      const name = ts.tablespace_name as string
-      const todayUsed = ts[usedField] as number
-      const prev = prevMap.get(name) ?? todayUsed
-      gMap.set(name, Math.max(0, todayUsed - prev))
-    }
-    setGrowthMap(gMap)
-
     const sevenDayAgo = new Date(new Date(date).getTime() - 6 * 86400000).toISOString().split('T')[0]
     const { data: sparkData } = await tb
       .select(`tablespace_name, ${pctField}, report_date`)
@@ -112,6 +77,39 @@ export default function DbDetailPage() {
       spMap.get(name)!.push(val)
     }
     setSparklineMap(spMap)
+
+    const { data: prevDateRow } = await tb
+      .select('report_date')
+      .lt('report_date', date)
+      .order('report_date', { ascending: false })
+      .limit(1)
+      .single()
+
+    const prevDate = prevDateRow?.report_date ?? null
+
+    if (!prevDate) {
+      setGrowthMap(new Map())
+    } else {
+      const { data: prevData } = await tb
+        .select(`tablespace_name, ${usedField}`)
+        .eq('report_date', prevDate)
+
+      const prevMap = new Map(
+        ((prevData || []) as Record<string, unknown>[]).map(r => [
+          r.tablespace_name as string,
+          r[usedField] as number,
+        ])
+      )
+
+      const gMap = new Map<string, number>()
+      for (const ts of (todayData as Record<string, unknown>[])) {
+        const name = ts.tablespace_name as string
+        const todayUsed = ts[usedField] as number
+        const prev = prevMap.get(name) ?? todayUsed
+        gMap.set(name, Math.max(0, todayUsed - prev))
+      }
+      setGrowthMap(gMap)
+    }
 
     setTablespaces(sortTablespaces(todayData as AnyTablespace[], schema))
     setLoading(false)
