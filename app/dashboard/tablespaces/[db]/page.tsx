@@ -62,7 +62,21 @@ export default function DbDetailPage() {
     const { data: todayData } = await tb.select('*').eq('report_date', date)
     if (!todayData) { setLoading(false); return }
 
-    const prevDate = new Date(new Date(date).getTime() - 86400000).toISOString().split('T')[0]
+    const { data: prevDateRow } = await tb
+      .select('report_date')
+      .lt('report_date', date)
+      .order('report_date', { ascending: false })
+      .limit(1)
+      .single()
+
+    const prevDate = prevDateRow?.report_date ?? null
+
+    if (!prevDate) {
+      setGrowthMap(new Map())
+      setLoading(false)
+      return
+    }
+
     const { data: prevData } = await tb
       .select(`tablespace_name, ${usedField}`)
       .eq('report_date', prevDate)
