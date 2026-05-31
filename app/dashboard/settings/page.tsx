@@ -65,10 +65,11 @@ const btnStyle: React.CSSProperties = {
 export default function SettingsPage() {
   const { warnThreshold, critThreshold, setWarnThreshold, setCritThreshold } = useThresholds()
 
-  const [alertEmail, setAlertEmail] = useState('hassan.haider@onyxes.com')
+  const [alertEmail, setAlertEmail] = useState('')
   const [reportTime, setReportTime] = useState('01:30')
   const [alertDelay, setAlertDelay] = useState('30')
   const [settingsSaved, setSettingsSaved] = useState(false)
+  const [settingsSaveError, setSettingsSaveError] = useState(false)
 
   // User management
   const [users, setUsers] = useState<UserEntry[]>([])
@@ -81,10 +82,17 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadUsers()
-    // Get current user id
     createClient().auth.getUser().then(({ data: { user } }) => {
       if (user) setCurrentUserId(user.id)
     })
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(d => {
+        if (d.alert_email !== undefined) setAlertEmail(d.alert_email)
+        if (d.expected_report_time !== undefined) setReportTime(d.expected_report_time)
+        if (d.missing_alert_delay !== undefined) setAlertDelay(String(d.missing_alert_delay))
+      })
+      .catch(() => {})
   }, [])
 
   function showMsg(text: string, ok: boolean) {
@@ -161,9 +169,25 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSaveSettings = () => {
-    setSettingsSaved(true)
-    setTimeout(() => setSettingsSaved(false), 2000)
+  const handleSaveSettings = async () => {
+    setSettingsSaveError(false)
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          alert_email: alertEmail,
+          expected_report_time: reportTime,
+          missing_alert_delay: Number(alertDelay),
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      setSettingsSaved(true)
+      setTimeout(() => setSettingsSaved(false), 2000)
+    } catch {
+      setSettingsSaveError(true)
+      setTimeout(() => setSettingsSaveError(false), 3000)
+    }
   }
 
   return (
@@ -232,9 +256,9 @@ export default function SettingsPage() {
 
         <button
           onClick={handleSaveSettings}
-          style={{ background: settingsSaved ? 'var(--hlb)' : 'var(--Gv)', color: settingsSaved ? 'var(--hl)' : '#080c14', border: settingsSaved ? '0.5px solid var(--hl)' : 'none', borderRadius: '6px', padding: '8px 20px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, transition: 'all 0.2s' }}
+          style={{ background: settingsSaveError ? 'var(--crb)' : settingsSaved ? 'var(--hlb)' : 'var(--Gv)', color: settingsSaveError ? 'var(--cr)' : settingsSaved ? 'var(--hl)' : '#080c14', border: settingsSaveError ? '0.5px solid var(--cr)' : settingsSaved ? '0.5px solid var(--hl)' : 'none', borderRadius: '6px', padding: '8px 20px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, transition: 'all 0.2s' }}
         >
-          {settingsSaved ? '✓ Saved' : 'Save Settings'}
+          {settingsSaveError ? '✕ Save failed' : settingsSaved ? '✓ Saved' : 'Save Settings'}
         </button>
       </Panel>
 

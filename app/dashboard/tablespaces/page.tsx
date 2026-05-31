@@ -1,4 +1,4 @@
-﻿import { createClient } from '@/lib/supabase/server'
+﻿import { createServiceClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { DatabaseSummary, DbRegistry } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'
@@ -6,8 +6,14 @@ import { StatusDot } from '@/components/shared/StatusDot'
 import { RingChart } from '@/components/dashboard/RingChart'
 
 async function getAllDatabases(): Promise<DatabaseSummary[]> {
-  const supabase = await createClient()
-  const today = new Date().toISOString().split('T')[0]
+  const supabase = createServiceClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: latestRow } = await (supabase.from('raid_ts') as any)
+    .select('report_date')
+    .order('report_date', { ascending: false })
+    .limit(1)
+    .single()
+  const today = latestRow?.report_date ?? new Date().toISOString().split('T')[0]
 
   const { data: registries } = await supabase
     .from('db_registry')

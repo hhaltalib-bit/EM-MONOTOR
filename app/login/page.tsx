@@ -67,7 +67,6 @@ export default function LoginPage() {
   const inpColor   = D ? '#666666'    : '#666666'
   const btnShadow  = D ? '0 0 20px rgba(22,163,74,0.25)' : '0 3px 14px rgba(22,163,74,0.28)'
   const statusText = D ? '#333333'    : '#AAAAAA'
-  const demoText   = D ? '#2a2a2a'    : '#CCCCCC'
   const togBg      = D ? 'rgba(255,255,255,0.04)' : '#F5F5F5'
   const togBrd     = D ? 'rgba(255,255,255,0.08)' : '#E0E0E0'
   const togColor   = D ? '#555555'    : '#666666'
@@ -410,14 +409,6 @@ export default function LoginPage() {
           </span>
         </div>
 
-        {/* Demo hint */}
-        <div style={{
-          fontSize:'12px',
-          color: demoText,
-          fontFamily:'monospace',
-        }}>
-          demo mode · any credentials
-        </div>
       </div>
     </div>
   )

@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { Resend } from 'resend'
-import { readFileSync } from 'fs'
 import { parseBackupReport } from '@/lib/parser/backup-parser'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendBackupStatusAlert } from '@/lib/email/alerts'
-
-const RMAN_TEST_FILE = 'C:\\Users\\hhalt\\OneDrive\\Desktop\\NOVIX PROJECTS\\enterprise monotoring system\\RMAN_BACKUP.html'
-const RMAN_TEST_DATE = '2026-05-14'
 
 function getOAuth2Client() {
   const oauth2Client = new google.auth.OAuth2(
@@ -175,29 +171,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // ── TEST MODE: ?test=1 reads the local RMAN_BACKUP.html instead of Gmail ──
-  const isTest   = new URL(request.url).searchParams.get('test')  === '1'
   const isForced = new URL(request.url).searchParams.get('force') === '1'
-  if (isTest) {
-    try {
-      const htmlContent = readFileSync(RMAN_TEST_FILE, 'utf-8')
-      const result = await parseAndStoreBackup(htmlContent, RMAN_TEST_DATE, 'test mode — local file')
-
-      return NextResponse.json({
-        success:        true,
-        mode:           'test',
-        reportDate:     result.reportDate,
-        databasesCount: result.databasesCount,
-        healthyCount:   result.healthyCount,
-        delayedCount:   result.delayedCount,
-        failedCount:    result.failedCount,
-        ignoredCount:   result.ignoredCount,
-      })
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return NextResponse.json({ success: false, error: msg }, { status: 500 })
-    }
-  }
 
   const reportDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' })
 

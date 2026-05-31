@@ -1,6 +1,16 @@
 import { Resend } from 'resend'
+import { createServiceClient } from '@/lib/supabase/server'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+
+async function getAlertEmail(): Promise<string> {
+  try {
+    const supabase = createServiceClient()
+    const { data } = await supabase.from('system_settings').select('alert_email').limit(1).single()
+    if (data?.alert_email) return data.alert_email
+  } catch { /* fall through */ }
+  return process.env.ALERT_EMAIL_TO || 'hassan.haider@onyxes.com'
+}
 
 export async function sendMissingReportAlert() {
   const today = new Date().toISOString().split('T')[0]
@@ -26,11 +36,12 @@ export async function sendMissingReportAlert() {
     </div>
   `
 
-  console.log('Sending alert to:', process.env.ALERT_EMAIL_TO)
+  const to = await getAlertEmail()
+  console.log('Sending alert to:', to)
   console.log('From:', process.env.ALERT_EMAIL_FROM)
   await resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
-    to: process.env.ALERT_EMAIL_TO || 'hassan.haider@onyxes.com',
+    to,
     subject,
     html,
   })
@@ -72,11 +83,12 @@ export async function sendBackupStatusAlert(data: {
     </div>
   `
 
-  console.log('Sending alert to:', process.env.ALERT_EMAIL_TO)
+  const to = await getAlertEmail()
+  console.log('Sending alert to:', to)
   console.log('From:', process.env.ALERT_EMAIL_FROM)
   await resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
-    to: process.env.ALERT_EMAIL_TO || 'hassan.haider@onyxes.com',
+    to,
     subject,
     html,
   })

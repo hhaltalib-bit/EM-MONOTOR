@@ -26,7 +26,16 @@ async function getOverviewData() {
     .limit(1)
     .single()
   const today = latestRow?.report_date ?? new Date().toISOString().split('T')[0]
-  const yesterday = new Date(new Date(today).getTime() - 86400000).toISOString().split('T')[0]
+
+  // Dynamic prior date — avoids broken growth when reports skip a day
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: prevRow } = await (supabase.from('raid_ts') as any)
+    .select('report_date')
+    .lt('report_date', today)
+    .order('report_date', { ascending: false })
+    .limit(1)
+    .single()
+  const yesterday: string | null = prevRow?.report_date ?? null
 
   const { data: registries } = await supabase
     .from('db_registry')
@@ -59,7 +68,9 @@ async function getOverviewData() {
         const tb = supabase.from(reg.table_name) as any
         const [{ data: todayData }, { data: prevData }] = await Promise.all([
           tb.select(`tablespace_name, ${pctField}, ${usedField}`).eq('report_date', today),
-          tb.select(`tablespace_name, ${usedField}`).eq('report_date', yesterday),
+          yesterday
+            ? tb.select(`tablespace_name, ${usedField}`).eq('report_date', yesterday)
+            : Promise.resolve({ data: null }),
         ])
 
         if (!todayData?.length) return empty

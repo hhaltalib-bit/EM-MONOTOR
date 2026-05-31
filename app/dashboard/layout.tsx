@@ -7,25 +7,10 @@ import { ThresholdProvider } from '@/contexts/ThresholdContext'
 import { DatabaseSummary, DbRegistry } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'
 import { sortDatabases } from '@/lib/utils/sort'
+import { getLatestReportDate } from '@/lib/utils/getLatestReportDate'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
-// Returns the most recent report_date that has data in raid_ts
-async function getLatestReportDate(): Promise<string> {
-  try {
-    const supabase = createServiceClient()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase.from('raid_ts') as any)
-      .select('report_date')
-      .order('report_date', { ascending: false })
-      .limit(1)
-      .single()
-    return data?.report_date ?? new Date().toISOString().split('T')[0]
-  } catch {
-    return new Date().toISOString().split('T')[0]
-  }
-}
 
 // Returns the most recent report_date from backup_status
 async function getLatestBackupDate(): Promise<string | null> {

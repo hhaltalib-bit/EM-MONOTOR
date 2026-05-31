@@ -31,12 +31,15 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const svc = createServiceClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: callerProfile } = await (svc.from('user_profiles') as any).select('role').eq('user_id', user.id).single()
+  if (callerProfile?.role !== 'Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const { email, password, role, display_name } = await req.json() as {
     email: string; password: string; role?: string; display_name?: string
   }
   if (!email || !password) return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
-
-  const svc = createServiceClient()
   const { data: { user: newUser }, error } = await svc.auth.admin.createUser({
     email,
     password,

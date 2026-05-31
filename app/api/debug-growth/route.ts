@@ -1,6 +1,10 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { searchParams } = new URL(request.url)
   const dbKey = searchParams.get('db') || 'dwh'
   const date  = searchParams.get('date') ||
