@@ -14,18 +14,11 @@ export async function GET(request: NextRequest) {
   try {
     const result = await fetchTodayReport(isForced)
 
-    console.log('STEP1 - Gmail search result:', {
-      found: result.found,
-      messageId: result.found ? result.messageId : null,
-    })
-
     if (!result.found) {
       try { await sendMissingReportAlert() } catch (e) { console.error('Missing report email failed:', e) }
       await logToDb('error', null, null, 0, 0, 'Report not found in Gmail')
       return NextResponse.json({ success: false, reason: 'report_not_found' })
     }
-
-    console.log('STEP2 - HTML content length:', result.content?.length)
 
     const ingestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/ingest${isForced ? '?test=1' : ''}`
     const ingestResponse = await fetch(ingestUrl, {
@@ -35,10 +28,6 @@ export async function GET(request: NextRequest) {
     })
 
     const ingestText = await ingestResponse.text()
-    console.log('STEP3 - Ingest response:', {
-      status: ingestResponse.status,
-      body: ingestText,
-    })
     const ingestData = JSON.parse(ingestText)
 
     return NextResponse.json({ success: true, gmail_message_id: result.messageId, ingest_result: ingestData })

@@ -38,6 +38,7 @@ export default function DbDetailPage() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState(false)
   const [registry, setRegistry] = useState<DbRegistry | null>(null)
   const [tablespaces, setTablespaces] = useState<AnyTablespace[]>([])
   const [growthMap, setGrowthMap] = useState<Map<string, number>>(new Map())
@@ -49,88 +50,89 @@ export default function DbDetailPage() {
 
   const fetchData = useCallback(async (date: string, reg: DbRegistry) => {
     setLoading(true)
-    const supabase = createClient()
+    setFetchError(false)
+    try {
+      const supabase = createClient()
 
-    const schema = reg.schema_type
-    const pctField = schema === 'standard' ? 'max_ts_pct_used' : 'percent_used'
-    const usedField = schema === 'standard' ? 'used_ts_size' : 'gb_used'
-    const tableName = reg.table_name
+      const schema = reg.schema_type
+      const pctField = schema === 'standard' ? 'max_ts_pct_used' : 'percent_used'
+      const usedField = schema === 'standard' ? 'used_ts_size' : 'gb_used'
+      const tableName = reg.table_name
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tb = supabase.from(tableName) as any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tb = supabase.from(tableName) as any
 
-    const { data: todayData } = await tb.select('*').eq('report_date', date)
-    if (!todayData) { setLoading(false); return }
+      const { data: todayData } = await tb.select('*').eq('report_date', date)
+      if (!todayData) { setLoading(false); return }
 
-    const sevenDayAgo = new Date(new Date(date).getTime() - 6 * 86400000).toISOString().split('T')[0]
-    const { data: sparkData } = await tb
-      .select(`tablespace_name, ${pctField}, report_date`)
-      .gte('report_date', sevenDayAgo)
-      .lte('report_date', date)
-      .order('report_date', { ascending: true })
+      const sevenDayAgo = new Date(new Date(date).getTime() - 6 * 86400000).toISOString().split('T')[0]
+      const { data: sparkData } = await tb
+        .select(`tablespace_name, ${pctField}, report_date`)
+        .gte('report_date', sevenDayAgo)
+        .lte('report_date', date)
+        .order('report_date', { ascending: true })
 
-    const spMap = new Map<string, number[]>()
-    for (const row of ((sparkData || []) as Record<string, unknown>[])) {
-      const name = row.tablespace_name as string
-      const val = row[pctField] as number
-      if (!spMap.has(name)) spMap.set(name, [])
-      spMap.get(name)!.push(val)
-    }
-    setSparklineMap(spMap)
-
-    const { data: prevDateRow } = await tb
-      .select('report_date')
-      .lt('report_date', date)
-      .order('report_date', { ascending: false })
-      .limit(1)
-      .single()
-
-    const prevDate = prevDateRow?.report_date ?? null
-
-    if (!prevDate) {
-      setGrowthMap(new Map())
-    } else {
-      const { data: prevData } = await tb
-        .select(`tablespace_name, ${usedField}`)
-        .eq('report_date', prevDate)
-
-      const prevMap = new Map(
-        ((prevData || []) as Record<string, unknown>[]).map(r => [
-          r.tablespace_name as string,
-          r[usedField] as number,
-        ])
-      )
-
-      const gMap = new Map<string, number>()
-      for (const ts of (todayData as Record<string, unknown>[])) {
-        const name = ts.tablespace_name as string
-        const todayUsed = ts[usedField] as number
-        const prev = prevMap.get(name) ?? todayUsed
-        gMap.set(name, Math.max(0, todayUsed - prev))
+      const spMap = new Map<string, number[]>()
+      for (const row of ((sparkData || []) as Record<string, unknown>[])) {
+        const name = row.tablespace_name as string
+        const val = row[pctField] as number
+        if (!spMap.has(name)) spMap.set(name, [])
+        spMap.get(name)!.push(val)
       }
-      setGrowthMap(gMap)
-    }
+      setSparklineMap(spMap)
 
-    setTablespaces(sortTablespaces(todayData as AnyTablespace[], schema))
-    setLoading(false)
+      const { data: prevDateRow } = await tb
+        .select('report_date')
+        .lt('report_date', date)
+        .order('report_date', { ascending: false })
+        .limit(1)
+        .single()
+
+      const prevDate = prevDateRow?.report_date ?? null
+
+      if (!prevDate) {
+        setGrowthMap(new Map())
+      } else {
+        const { data: prevData } = await tb
+          .select(`tablespace_name, ${usedField}`)
+          .eq('report_date', prevDate)
+
+        const prevMap = new Map(
+          ((prevData || []) as Record<string, unknown>[]).map(r => [
+            r.tablespace_name as string,
+            r[usedField] as number,
+          ])
+        )
+
+        const gMap = new Map<string, number>()
+        for (const ts of (todayData as Record<string, unknown>[])) {
+          const name = ts.tablespace_name as string
+          const todayUsed = ts[usedField] as number
+          const prev = prevMap.get(name) ?? todayUsed
+          gMap.set(name, Math.max(0, todayUsed - prev))
+        }
+        setGrowthMap(gMap)
+      }
+
+      setTablespaces(sortTablespaces(todayData as AnyTablespace[], schema))
+      setLoading(false)
+    } catch {
+      setFetchError(true)
+      setLoading(false)
+    }
   }, [])
 
   // On mount: resolve registry + latest date via API, then load data
   useEffect(() => {
     async function init() {
       try {
-        console.log('DB key:', dbKey)
         const res = await fetch(`/api/db-info?db_key=${encodeURIComponent(dbKey)}`)
         if (!res.ok) {
-          const text = await res.text()
-          console.log('API error:', res.status, text)
           setError(`Failed to load database info (${res.status})`)
           setLoading(false)
           return
         }
         const { registry: reg, latestDate } = await res.json() as { registry: DbRegistry; latestDate: string | null }
-        console.log('Registry:', reg)
-        console.log('Report date:', latestDate)
 
         if (!reg) {
           setError(`Database "${dbKey}" not found in registry`)
@@ -150,6 +152,10 @@ export default function DbDetailPage() {
     }
     init()
   }, [dbKey, fetchData])
+
+  useEffect(() => {
+    if (registry?.db_name) document.title = `EM Monitor — ${registry.db_name}`
+  }, [registry?.db_name])
 
   const schema = registry?.schema_type || 'standard'
 
@@ -175,6 +181,15 @@ export default function DbDetailPage() {
       setReportDate(next)
       fetchData(next, registry)
     }
+  }
+
+  if (fetchError) {
+    return (
+      <div style={{ padding: '48px', textAlign: 'center', color: 'var(--tx3)', fontFamily: 'monospace', fontSize: '12px' }}>
+        Unable to load data — database connection failed.<br />
+        Please refresh the page or contact your administrator.
+      </div>
+    )
   }
 
   return (

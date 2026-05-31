@@ -2,7 +2,7 @@
 
 import { StandardTablespace, DwhTablespace, Severity } from '@/types'
 import { getSeverity, getSeverityColor, getSeverityClass } from '@/lib/utils/severity'
-import { fmtSize, fmtPct, growthText, actionText } from '@/lib/utils/format'
+import { fmtSize, fmtPct, growthText, actionText, forecastText } from '@/lib/utils/format'
 import { useThresholds } from '@/contexts/ThresholdContext'
 import { ProgressBar } from './ProgressBar'
 import { Sparkline } from './Sparkline'
@@ -36,6 +36,7 @@ export function TsCard({ ts, schemaType, growthGb, sparklineData, index, reportD
   const color = getSeverityColor(severity)
   const growth = growthText(growthGb)
   const action = actionText(pct)
+  const forecast = growthGb > 0 ? forecastText(pct, growthGb) : null
 
   const severityLabel =
     severity === 'critical' ? 'CRITICAL' :
@@ -118,6 +119,11 @@ export function TsCard({ ts, schemaType, growthGb, sparklineData, index, reportD
           {action.text}
         </span>
       </div>
+      {forecast && (
+        <div style={{ fontSize: '10px', color: 'var(--tx3)', fontFamily: 'monospace', marginTop: '2px' }}>
+          {forecast}
+        </div>
+      )}
     </div>
   )
 }

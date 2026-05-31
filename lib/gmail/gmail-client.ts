@@ -1,6 +1,6 @@
 import { google } from 'googleapis'
 
-function getOAuth2Client() {
+export function getOAuth2Client() {
   const oauth2Client = new google.auth.OAuth2(
     process.env.GMAIL_CLIENT_ID,
     process.env.GMAIL_CLIENT_SECRET,
@@ -22,16 +22,12 @@ export async function fetchTodayReport(forced = false): Promise<{ found: false }
     ? `subject:"FW: TableSpace Report" newer_than:1d`
     : `subject:"FW: TableSpace Report" newer_than:4h`
 
-  console.log('Gmail query:', q)
-
   try {
     const { data: listData } = await gmail.users.messages.list({
       userId: 'me',
       q,
       maxResults: 5,
     })
-
-    console.log('Messages found:', listData.messages?.length ?? 0)
 
     if (!listData.messages || listData.messages.length === 0) {
       return { found: false }
@@ -45,9 +41,6 @@ export async function fetchTodayReport(forced = false): Promise<{ found: false }
       id: messageId,
       format: 'full',
     })
-
-    const subject = message.payload?.headers?.find(h => h.name === 'Subject')?.value
-    console.log('First message subject:', subject)
 
     // Find HTML attachment or body
     const payload = message.payload
@@ -65,7 +58,9 @@ export async function fetchTodayReport(forced = false): Promise<{ found: false }
   }
 }
 
-function findHtmlContent(payload: { mimeType?: string | null; body?: { data?: string | null; size?: number | null } | null; parts?: typeof payload[] | null }): string | null {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function findHtmlContent(payload: any): string | null {
+  if (!payload) return null
   if (payload.mimeType === 'text/html' && payload.body?.data) {
     return Buffer.from(payload.body.data, 'base64').toString('utf-8')
   }

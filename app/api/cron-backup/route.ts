@@ -1,34 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import { Resend } from 'resend'
 import { parseBackupReport } from '@/lib/parser/backup-parser'
 import { createServiceClient } from '@/lib/supabase/server'
-import { sendBackupStatusAlert } from '@/lib/email/alerts'
-
-function getOAuth2Client() {
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GMAIL_CLIENT_ID,
-    process.env.GMAIL_CLIENT_SECRET,
-    'https://developers.google.com/oauthplayground'
-  )
-  oauth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN })
-  return oauth2Client
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findHtmlContent(payload: any): string | null {
-  if (!payload) return null
-  if (payload.mimeType === 'text/html' && payload.body?.data) {
-    return Buffer.from(payload.body.data, 'base64').toString('utf-8')
-  }
-  if (payload.parts) {
-    for (const part of payload.parts) {
-      const found = findHtmlContent(part)
-      if (found) return found
-    }
-  }
-  return null
-}
+import { sendBackupStatusAlert, sendMissingBackupAlert } from '@/lib/email/alerts'
+import { getOAuth2Client, findHtmlContent } from '@/lib/gmail/gmail-client'
 
 async function logBackupReport(
   reportDate: string,
@@ -53,34 +28,6 @@ async function logBackupReport(
       notes,
     })
   } catch { /* non-critical */ }
-}
-
-async function sendMissingBackupAlert(reportDate: string) {
-  const resend = new Resend(process.env.RESEND_API_KEY)
-  console.log('Sending alert to:', process.env.ALERT_EMAIL_TO)
-  console.log('From:', process.env.ALERT_EMAIL_FROM)
-  await resend.emails.send({
-    from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
-    to:   process.env.ALERT_EMAIL_TO   || 'hassan.haider@onyxes.com',
-    subject: `⚠️ EM MONITOR: RMAN Backup Report NOT received — ${reportDate}`,
-    html: `
-      <div style="font-family:system-ui,sans-serif;background:#080c14;color:#c9d1d9;padding:24px;max-width:600px;">
-        <h1 style="font-size:20px;font-weight:500;color:#d29922;margin:0 0 8px;">Missing RMAN Backup Report</h1>
-        <p style="color:#8b949e;margin:0 0 16px;font-size:13px;">${reportDate}</p>
-        <div style="background:#391e05;border:0.5px solid #d29922;border-radius:8px;padding:12px 16px;">
-          <p style="margin:0;font-size:13px;color:#d29922;">
-            The daily RMAN Backup Report was expected at 07:00–08:00 AM (GMT+3) but was not found in Gmail.
-          </p>
-          <p style="margin:8px 0 0;font-size:11px;color:#8b949e;font-family:monospace;">
-            Please check: RMAN scheduler · email forwarding rules · Gmail connectivity
-          </p>
-        </div>
-        <p style="font-size:11px;color:#3d5068;font-family:monospace;margin-top:20px;">
-          EM MONITOR Enterprise · Automated Alert
-        </p>
-      </div>
-    `,
-  })
 }
 
 interface ParseAndStoreResult {

@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export const metadata = { title: 'EM Monitor — Overview' }
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { StatCard } from '@/components/dashboard/StatCard'

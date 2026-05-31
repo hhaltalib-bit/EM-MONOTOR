@@ -26,7 +26,7 @@ export function Topbar({
   userInitials = 'HH',
   notificationCount = 0,
   reportTime = null,
-  backupReportTime: _backupReportTime = null,
+  backupReportTime = null,
   toast = null,
 }: TopbarProps) {
   const pathname = usePathname()
@@ -125,6 +125,30 @@ export function Topbar({
             {reportTime ? `Report · ${reportTime}` : 'No report'}
           </span>
         </div>
+
+        {/* Backup report status */}
+        {backupReportTime && (
+          <div
+            onClick={() => router.push('/dashboard/backup')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '11px',
+              color: 'var(--Gv)',
+              background: 'var(--Gd)',
+              border: '0.5px solid var(--Gl)',
+              padding: '3px 9px',
+              borderRadius: '5px',
+              cursor: 'pointer',
+            }}
+          >
+            <i className="ti ti-shield-check" style={{ fontSize: '11px' }} />
+            <span className="mn" style={{ fontSize: '11px' }}>
+              Backup · {backupReportTime}
+            </span>
+          </div>
+        )}
 
         {/* Theme toggle */}
         <ThemeToggle />

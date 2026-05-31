@@ -31,6 +31,8 @@ const selectStyle: React.CSSProperties = {
 }
 
 export default function AnalyticsPage() {
+  useEffect(() => { document.title = 'EM Monitor — Analytics' }, [])
+
   const { warnThreshold, critThreshold } = useThresholds()
   const [databases, setDatabases] = useState<DbRegistry[]>([])
   const [tablespaces, setTablespaces] = useState<string[]>([])

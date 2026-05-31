@@ -37,8 +37,6 @@ export async function sendMissingReportAlert() {
   `
 
   const to = await getAlertEmail()
-  console.log('Sending alert to:', to)
-  console.log('From:', process.env.ALERT_EMAIL_FROM)
   await resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
     to,
@@ -84,12 +82,35 @@ export async function sendBackupStatusAlert(data: {
   `
 
   const to = await getAlertEmail()
-  console.log('Sending alert to:', to)
-  console.log('From:', process.env.ALERT_EMAIL_FROM)
   await resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
     to,
     subject,
     html,
+  })
+}
+
+export async function sendMissingBackupAlert(reportDate: string) {
+  await resend.emails.send({
+    from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
+    to:   process.env.ALERT_EMAIL_TO   || 'hassan.haider@onyxes.com',
+    subject: `⚠️ EM MONITOR: RMAN Backup Report NOT received — ${reportDate}`,
+    html: `
+      <div style="font-family:system-ui,sans-serif;background:#080c14;color:#c9d1d9;padding:24px;max-width:600px;">
+        <h1 style="font-size:20px;font-weight:500;color:#d29922;margin:0 0 8px;">Missing RMAN Backup Report</h1>
+        <p style="color:#8b949e;margin:0 0 16px;font-size:13px;">${reportDate}</p>
+        <div style="background:#391e05;border:0.5px solid #d29922;border-radius:8px;padding:12px 16px;">
+          <p style="margin:0;font-size:13px;color:#d29922;">
+            The daily RMAN Backup Report was expected at 07:00–08:00 AM (GMT+3) but was not found in Gmail.
+          </p>
+          <p style="margin:8px 0 0;font-size:11px;color:#8b949e;font-family:monospace;">
+            Please check: RMAN scheduler · email forwarding rules · Gmail connectivity
+          </p>
+        </div>
+        <p style="font-size:11px;color:#3d5068;font-family:monospace;margin-top:20px;">
+          EM MONITOR Enterprise · Automated Alert
+        </p>
+      </div>
+    `,
   })
 }

@@ -22,8 +22,10 @@ export function ThresholdProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const warn = parseInt(localStorage.getItem('warnThreshold') ?? '80', 10)
-      const crit = parseInt(localStorage.getItem('critThreshold') ?? '90', 10)
+      const saved = localStorage.getItem('em_thresholds')
+      const parsed = saved ? JSON.parse(saved) : null
+      const warn = parsed?.warn ?? 80
+      const crit = parsed?.crit ?? 90
       if (!isNaN(warn) && warn >= 50 && warn <= 99) setWarnThresholdState(warn)
       if (!isNaN(crit) && crit >= 50 && crit <= 99) setCritThresholdState(crit)
     } catch {}
@@ -31,12 +33,12 @@ export function ThresholdProvider({ children }: { children: ReactNode }) {
 
   const setWarnThreshold = (v: number) => {
     setWarnThresholdState(v)
-    try { localStorage.setItem('warnThreshold', String(v)) } catch {}
+    try { localStorage.setItem('em_thresholds', JSON.stringify({ warn: v, crit: critThreshold })) } catch {}
   }
 
   const setCritThreshold = (v: number) => {
     setCritThresholdState(v)
-    try { localStorage.setItem('critThreshold', String(v)) } catch {}
+    try { localStorage.setItem('em_thresholds', JSON.stringify({ warn: warnThreshold, crit: v })) } catch {}
   }
 
   return (

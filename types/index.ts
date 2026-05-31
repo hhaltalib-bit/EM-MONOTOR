@@ -53,32 +53,6 @@ export interface DbRegistry {
 // Severity levels
 export type Severity = 'critical' | 'warning' | 'healthy'
 
-export function getSeverity(pct: number): Severity {
-  if (pct >= 90) return 'critical'
-  if (pct >= 80) return 'warning'
-  return 'healthy'
-}
-
-export function getSeverityColor(severity: Severity): string {
-  if (severity === 'critical') return 'var(--cr)'
-  if (severity === 'warning') return 'var(--wa)'
-  return 'var(--hl)'
-}
-
-export function getSeverityBg(severity: Severity): string {
-  if (severity === 'critical') return 'var(--crb)'
-  if (severity === 'warning') return 'var(--wab)'
-  return 'var(--hlb)'
-}
-
-// Growth calculation result
-export interface GrowthResult {
-  tablespace_name: string
-  today_used: number
-  yesterday_used: number | null
-  growth_gb: number
-}
-
 // Toast types
 export type ToastType = 'ok' | 'wa' | 'cr'
 

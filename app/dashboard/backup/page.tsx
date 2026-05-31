@@ -198,6 +198,8 @@ export default function BackupPage() {
   const [data, setData] = useState<BackupSummaryData | null>(null)
   const [loading, setLoading] = useState(true)
 
+  useEffect(() => { document.title = 'EM Monitor — Backup Monitor' }, [])
+
   useEffect(() => {
     fetch('/api/backup-summary')
       .then(r => r.json())

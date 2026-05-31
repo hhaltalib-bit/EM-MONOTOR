@@ -1,4 +1,6 @@
-﻿import { createServiceClient } from '@/lib/supabase/server'
+﻿export const metadata = { title: 'EM Monitor — Tablespaces' }
+
+import { createServiceClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { DatabaseSummary, DbRegistry } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'

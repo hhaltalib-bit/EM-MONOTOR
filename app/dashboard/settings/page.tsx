@@ -63,6 +63,8 @@ const btnStyle: React.CSSProperties = {
 }
 
 export default function SettingsPage() {
+  useEffect(() => { document.title = 'EM Monitor — Settings' }, [])
+
   const { warnThreshold, critThreshold, setWarnThreshold, setCritThreshold } = useThresholds()
 
   const [alertEmail, setAlertEmail] = useState('')

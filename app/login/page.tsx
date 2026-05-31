@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import OrbitRings from '@/components/OrbitRings'
 
 export default function LoginPage() {
+  useEffect(() => { document.title = 'EM Monitor — Sign In' }, [])
+
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
@@ -36,7 +38,7 @@ export default function LoginPage() {
     }
 
     if (data.session) {
-      window.location.href = '/dashboard'
+      router.push('/dashboard')
     }
   }
 
