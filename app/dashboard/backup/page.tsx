@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { BackupSummaryData, BackupStatusRow, BackupReportInfo } from '@/app/api/backup-summary/route'
+import type { BackupSummaryData, BackupStatusRow, BackupReportInfo, BackupHistoryRow } from '@/app/api/backup-summary/route'
 
 // ─── Theme-adaptive palette (CSS variables) ──────────────────────────────────
 const BG  = 'var(--bg)'
@@ -193,19 +193,85 @@ function EmptyState() {
   )
 }
 
+// ─── Nav button ──────────────────────────────────────────────────────────────
+function NavBtn({ label, onClick, disabled }: { label: string; onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        background: 'transparent', border: `0.5px solid ${disabled ? 'transparent' : 'var(--bdv)'}`,
+        borderRadius: '4px', padding: '2px 7px', fontSize: '13px', color: disabled ? 'var(--tx3)' : 'var(--txv)',
+        cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.35 : 1,
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
+// ─── History table ───────────────────────────────────────────────────────────
+function HistoryTable({ rows }: { rows: BackupHistoryRow[] }) {
+  if (rows.length === 0) return null
+  return (
+    <div style={{ background: BG2, border: `0.5px solid ${BD}`, borderRadius: '8px', overflow: 'hidden', marginTop: '16px' }}>
+      <div style={{ padding: '10px 14px', borderBottom: `0.5px solid ${BD}`, fontSize: '9px', color: TX3, textTransform: 'uppercase' as const, letterSpacing: '0.7px', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <i className="ti ti-history" style={{ fontSize: '13px' }} />
+        Backup History · Last 30 days
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: 'monospace' }}>
+          <thead>
+            <tr style={{ borderBottom: `0.5px solid ${BD}` }}>
+              {['Date', 'Healthy', 'Delayed', 'Failed', 'Ignored', 'Status'].map(h => (
+                <th key={h} style={{ padding: '6px 14px', textAlign: 'left', fontSize: '9px', color: TX3, textTransform: 'uppercase' as const, letterSpacing: '0.5px', fontWeight: 500 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const hasFailed  = (row.failed_count ?? 0) > 0
+              const hasDelayed = (row.delayed_count ?? 0) > 0
+              const rowColor = hasFailed ? R : hasDelayed ? A : G
+              const rowBg    = hasFailed ? RB : hasDelayed ? AB : GB
+              return (
+                <tr key={`${row.report_date}-${i}`} style={{ borderBottom: i < rows.length - 1 ? `0.5px solid ${BG3}` : undefined }}>
+                  <td style={{ padding: '7px 14px', color: TX }}>{row.report_date}</td>
+                  <td style={{ padding: '7px 14px', color: G }}>{row.healthy_count ?? '—'}</td>
+                  <td style={{ padding: '7px 14px', color: A }}>{row.delayed_count ?? '—'}</td>
+                  <td style={{ padding: '7px 14px', color: R }}>{row.failed_count ?? '—'}</td>
+                  <td style={{ padding: '7px 14px', color: TX3 }}>{row.ignored_count ?? '—'}</td>
+                  <td style={{ padding: '7px 14px' }}>
+                    <span style={{ background: rowBg, color: rowColor, borderRadius: '3px', padding: '1px 6px', fontSize: '9px', textTransform: 'uppercase' as const, letterSpacing: '0.4px' }}>
+                      {row.status}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ───────────────────────────────────────────────────────────────
 export default function BackupPage() {
   const [data, setData] = useState<BackupSummaryData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [viewDate, setViewDate] = useState<string | null>(null)
 
   useEffect(() => { document.title = 'EM Monitor — Backup Monitor' }, [])
 
   useEffect(() => {
-    fetch('/api/backup-summary')
+    setLoading(true)
+    const url = viewDate ? `/api/backup-summary?date=${encodeURIComponent(viewDate)}` : '/api/backup-summary'
+    fetch(url)
       .then(r => r.json())
       .then((d: BackupSummaryData) => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }, [viewDate])
 
   if (loading) return <LoadingSkeleton />
   if (!data?.latestDate) return <EmptyState />
@@ -229,34 +295,19 @@ export default function BackupPage() {
     <div style={{ padding: '12px 16px', background: BG, minHeight: '100%', animation: 'pgFade 0.2s' }}>
 
       {/* ── HEADER BAR ─────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ fontSize: '16px', fontWeight: 500, color: TX }}>RMAN Backup Status</div>
-          <div style={{ fontSize: '10px', color: TX3, fontFamily: 'monospace', marginTop: '2px' }}>
-            {data.latestDate}
+          {/* Date navigation */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <NavBtn label="←" onClick={() => data?.prevDate && setViewDate(data.prevDate)} disabled={!data?.prevDate} />
+            <span style={{ fontSize: '11px', color: TX, fontFamily: 'monospace', minWidth: '86px', textAlign: 'center' }}>
+              {data.latestDate ?? '—'}
+            </span>
+            <NavBtn label="→" onClick={() => data?.nextDate && setViewDate(data.nextDate)} disabled={!data?.nextDate} />
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-          {/* Backup report date pill */}
-          {data.latestDate ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              background: GB, border: `0.5px solid ${G}`,
-              borderRadius: '5px', padding: '3px 9px', fontSize: '11px', color: G,
-            }}>
-              <i className="ti ti-circle-check" style={{ fontSize: '11px' }} />
-              <span style={{ fontFamily: 'monospace' }}>Backup · {data.latestDate}</span>
-            </div>
-          ) : (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              background: BG3, border: `0.5px solid ${BD}`,
-              borderRadius: '5px', padding: '3px 9px', fontSize: '11px', color: TX3,
-            }}>
-              <i className="ti ti-clock" style={{ fontSize: '11px' }} />
-              <span style={{ fontFamily: 'monospace' }}>No report</span>
-            </div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* Export */}
           <button
             onClick={() => exportCSV(failed, delayed, healthy, ignored, data.latestDate!)}
@@ -502,6 +553,10 @@ export default function BackupPage() {
 
         </div>
       </div>
+
+      {/* ── BACKUP HISTORY ─────────────────────────────────────────────────── */}
+      <HistoryTable rows={data.history ?? []} />
+
     </div>
   )
 }

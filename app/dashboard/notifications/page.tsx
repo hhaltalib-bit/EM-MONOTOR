@@ -1,28 +1,39 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { DbRegistry } from '@/types'
 import { getLatestReportDate } from '@/lib/utils/getLatestReportDate'
 
 interface AlertEntry {
+  db_key: string
   db_name: string
   tablespace_name: string
   pct: number
   severity: 'critical' | 'warning'
 }
 
-async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string }> {
+interface HistoryEntry {
+  report_date: string
+  type: 'TS_INGEST' | 'BACKUP'
+  count: number | null
+  status: string
+}
+
+async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; history: HistoryEntry[] }> {
   const supabase = createServiceClient()
 
   const reportDate = await getLatestReportDate()
 
-  const { data: registries } = await supabase
-    .from('db_registry')
-    .select('*')
-    .eq('is_active', true)
+  const [{ data: registries }, { data: tsLogs }, { data: backupLogs }] = await Promise.all([
+    supabase.from('db_registry').select('*').eq('is_active', true),
+    supabase.from('report_log').select('report_date, status, databases_processed').order('report_date', { ascending: false }).limit(30),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('backup_report_log') as any).select('report_date, status, databases_count').order('report_date', { ascending: false }).limit(30),
+  ])
 
-  if (!registries?.length) return { alerts: [], reportDate }
+  if (!registries?.length) return { alerts: [], reportDate, history: [] }
 
   const results = await Promise.all(
     (registries as DbRegistry[]).map(async (reg) => {
@@ -35,6 +46,7 @@ async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string }
           .gte(pctField, 80)
         if (!data?.length) return [] as AlertEntry[]
         return (data as Record<string, unknown>[]).map(row => ({
+          db_key: reg.db_key,
           db_name: reg.db_name,
           tablespace_name: row.tablespace_name as string,
           pct: row[pctField] as number,
@@ -52,11 +64,29 @@ async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string }
     return b.pct - a.pct
   })
 
-  return { alerts, reportDate }
+  const tsHistory: HistoryEntry[] = (tsLogs ?? []).map((r: Record<string, unknown>) => ({
+    report_date: r.report_date as string,
+    type: 'TS_INGEST' as const,
+    count: (r.databases_processed as number | null) ?? null,
+    status: r.status as string,
+  }))
+
+  const backupHistory: HistoryEntry[] = (backupLogs ?? []).map((r: Record<string, unknown>) => ({
+    report_date: r.report_date as string,
+    type: 'BACKUP' as const,
+    count: (r.databases_count as number | null) ?? null,
+    status: r.status as string,
+  }))
+
+  const history = [...tsHistory, ...backupHistory]
+    .sort((a, b) => b.report_date.localeCompare(a.report_date))
+    .slice(0, 30)
+
+  return { alerts, reportDate, history }
 }
 
 export default async function NotificationsPage() {
-  const { alerts, reportDate } = await getAlerts()
+  const { alerts, reportDate, history } = await getAlerts()
 
   const critCount = alerts.filter(a => a.severity === 'critical').length
   const warnCount = alerts.filter(a => a.severity === 'warning').length
@@ -96,12 +126,14 @@ export default async function NotificationsPage() {
             const icon = isCritical ? 'ti-alert-circle' : 'ti-alert-triangle'
 
             return (
-              <div
+              <Link
                 key={`${item.db_name}-${item.tablespace_name}`}
+                href={`/dashboard/tablespaces/${item.db_key}`}
                 style={{
-                  display: 'flex', gap: '12px', padding: '10px 16px',
+                  display: 'flex', gap: '12px', padding: '10px 16px', textDecoration: 'none',
                   borderBottom: i < alerts.length - 1 ? '0.5px solid var(--bdv)' : undefined,
                   animation: `slideUp 0.3s ${i * 0.03}s ease-out both`,
+                  cursor: 'pointer',
                 }}
               >
                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -120,11 +152,51 @@ export default async function NotificationsPage() {
                     {item.pct.toFixed(2)}%
                   </span>
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>
       </div>
+
+      {/* System log history */}
+      {history.length > 0 && (
+        <div style={{ background: 'var(--bg2)', border: '0.5px solid var(--bdv)', borderRadius: '8px', overflow: 'hidden', marginTop: '12px', animation: 'slideUp 0.4s 0.15s both' }}>
+          <div style={{ padding: '10px 16px', borderBottom: '0.5px solid var(--bdv)', fontSize: '9px', color: 'var(--tx2)', textTransform: 'uppercase', letterSpacing: '0.7px', fontFamily: 'monospace', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <i className="ti ti-history" style={{ fontSize: '13px', color: 'var(--tx3)' }} />
+            System Log · Last 30 entries
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: 'monospace' }}>
+              <thead>
+                <tr style={{ borderBottom: '0.5px solid var(--bdv)' }}>
+                  {['Date', 'Type', 'Count', 'Status'].map(h => (
+                    <th key={h} style={{ padding: '6px 16px', textAlign: 'left', fontSize: '9px', color: 'var(--tx3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 500 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((row, i) => {
+                  const isOk = row.status === 'success'
+                  const statusColor = isOk ? 'var(--hl)' : 'var(--cr)'
+                  const statusBg = isOk ? 'var(--hlb)' : 'var(--crb)'
+                  return (
+                    <tr key={`${row.type}-${row.report_date}-${i}`} style={{ borderBottom: i < history.length - 1 ? '0.5px solid var(--bg4)' : undefined }}>
+                      <td style={{ padding: '7px 16px', color: 'var(--txv)' }}>{row.report_date}</td>
+                      <td style={{ padding: '7px 16px', color: 'var(--tx2)' }}>{row.type}</td>
+                      <td style={{ padding: '7px 16px', color: 'var(--tx3)' }}>{row.count ?? '—'}</td>
+                      <td style={{ padding: '7px 16px' }}>
+                        <span style={{ background: statusBg, color: statusColor, borderRadius: '3px', padding: '1px 6px', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          {row.status}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

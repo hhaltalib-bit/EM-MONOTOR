@@ -10,6 +10,7 @@ import { DbRegistry } from '@/types'
 interface ChartPoint {
   date: string
   value: number
+  gbValue?: number
 }
 
 const RANGES = [
@@ -98,13 +99,14 @@ export default function AnalyticsPage() {
     setLoadingChart(true)
 
     const usedField = selectedReg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
+    const sizeField = selectedReg.schema_type === 'standard' ? 'used_ts_size' : 'gb_used'
     const toDate = latestDate
     const fromDate = new Date(new Date(latestDate).getTime() - selectedRange * 86400000).toISOString().split('T')[0]
 
     const supabase = createClient()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(supabase.from(selectedReg.table_name) as any)
-      .select(`report_date, ${usedField}`)
+      .select(`report_date, ${usedField}, ${sizeField}`)
       .eq('tablespace_name', selectedTs)
       .gte('report_date', fromDate)
       .lte('report_date', toDate)
@@ -113,6 +115,7 @@ export default function AnalyticsPage() {
         setChartData((data ?? []).map(r => ({
           date: r.report_date as string,
           value: r[usedField] as number,
+          gbValue: r[sizeField] as number,
         })))
         setLoadingChart(false)
       })
@@ -131,6 +134,14 @@ export default function AnalyticsPage() {
     currentSeverity === 'critical' ? 'var(--cr)' :
     currentSeverity === 'warning'  ? 'var(--wa)' : 'var(--hl)'
   const last7 = chartData.slice(-7)
+
+  const growthData = chartData.length > 1
+    ? chartData.slice(1).map((d, i) => ({
+        date: d.date,
+        value: parseFloat(Math.max(0, (d.gbValue ?? 0) - (chartData[i].gbValue ?? 0)).toFixed(2)),
+      }))
+    : []
+  const growthMax = growthData.length > 0 ? Math.max(...growthData.map(d => d.value), 0.1) : 1
 
   return (
     <div style={{ padding: '12px 16px' }}>
@@ -242,6 +253,25 @@ export default function AnalyticsPage() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* Daily GB growth chart */}
+          {growthData.length >= 2 && (
+            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '0.5px solid var(--bdv)' }}>
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--txv)', fontFamily: 'monospace' }}>
+                  Daily Growth (GB)
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--tx3)', fontFamily: 'monospace' }}>
+                  {selectedTs} · day-over-day used size delta
+                </div>
+              </div>
+              {loadingChart ? (
+                <div className="sk" style={{ height: '185px', borderRadius: '6px' }} />
+              ) : (
+                <LineChart data={growthData} severity="healthy" maxValue={growthMax} />
+              )}
             </div>
           )}
         </div>

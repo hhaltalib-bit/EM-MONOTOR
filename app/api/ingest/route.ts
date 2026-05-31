@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseHtmlReport } from '@/lib/parser/html-parser'
 import { ParsedStandardRow, ParsedDwhRow } from '@/types'
+import { sendRapidGrowthAlert } from '@/lib/email/alerts'
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
@@ -130,6 +131,45 @@ export async function POST(request: NextRequest) {
       warningCount += warn.length
       if (crit.length > 0) criticalDbs.push(reg.db_name || reg.db_key)
     }
+  }
+
+  // Check for rapid growth over 7-day window
+  if (parsed.report_date && dbsProcessed > 0) {
+    try {
+      const { data: settingsRow } = await supabase
+        .from('system_settings')
+        .select('rapid_growth_threshold_gb')
+        .limit(1)
+        .single()
+      const threshold = parseFloat((settingsRow as Record<string, string> | null)?.rapid_growth_threshold_gb ?? '50') || 50
+      const sevenDaysAgo = new Date(new Date(parsed.report_date).getTime() - 7 * 86400000).toISOString().split('T')[0]
+      const rapidItems: { db_name: string; ts_name: string; growth_gb: number }[] = []
+
+      for (const reg of (registries || [])) {
+        const usedField = reg.schema_type === 'standard' ? 'used_ts_size' : 'gb_used'
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tb = supabase.from(reg.table_name) as any
+        const [{ data: todayGb }, { data: weekAgoGb }] = await Promise.all([
+          tb.select(`tablespace_name, ${usedField}`).eq('report_date', parsed.report_date),
+          tb.select(`tablespace_name, ${usedField}`).eq('report_date', sevenDaysAgo),
+        ])
+        if (!todayGb?.length || !weekAgoGb?.length) continue
+        const weekMap = new Map((weekAgoGb as Record<string, unknown>[]).map(r => [r.tablespace_name as string, r[usedField] as number]))
+        for (const row of todayGb as Record<string, unknown>[]) {
+          const name = row.tablespace_name as string
+          const todayVal = row[usedField] as number
+          const weekVal = weekMap.get(name) ?? todayVal
+          const growth = todayVal - weekVal
+          if (growth >= threshold) {
+            rapidItems.push({ db_name: reg.db_name || reg.db_key, ts_name: name, growth_gb: growth })
+          }
+        }
+      }
+
+      if (rapidItems.length > 0) {
+        await sendRapidGrowthAlert(parsed.report_date, rapidItems)
+      }
+    } catch { /* non-critical */ }
   }
 
   return NextResponse.json({

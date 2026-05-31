@@ -2,14 +2,17 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const metadata = { title: 'EM Monitor — Overview' }
 
+import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { DbCard } from '@/components/dashboard/DbCard'
+import { RefreshButton } from '@/components/dashboard/RefreshButton'
 import { DatabaseSummary, DbRegistry, TopGrowing } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'
 import { sortDatabases } from '@/lib/utils/sort'
 
 interface RecentAlert {
+  db_key: string
   db_name: string
   tablespace_name: string
   pct: number
@@ -101,6 +104,7 @@ async function getOverviewData() {
         const criticals: RecentAlert[] = (todayData as Record<string, unknown>[])
           .filter(row => (row[pctField] as number) >= 90)
           .map(row => ({
+            db_key: reg.db_key,
             db_name: reg.db_name,
             tablespace_name: row.tablespace_name as string,
             pct: row[pctField] as number,
@@ -176,6 +180,10 @@ export default async function DashboardPage() {
 
   return (
     <div style={{ padding: '12px 16px' }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+        <RefreshButton />
+      </div>
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginBottom: '12px' }}>
         <StatCard label="Critical DBs"  value={criticalDbs.length}     subtitle={`${totalCriticalTs} tablespaces`} icon="ti-alert-circle"   severity="critical" delay={0} />
@@ -236,9 +244,10 @@ export default async function DashboardPage() {
               <div style={{ fontSize: '10px', color: 'var(--tx3)', fontFamily: 'monospace' }}>No alerts</div>
             )}
             {recentAlerts.map((alert, i) => (
-              <div
+              <Link
                 key={`${alert.db_name}-${alert.tablespace_name}`}
-                style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '5px 0', borderBottom: i < recentAlerts.length - 1 ? '0.5px solid var(--bg4)' : undefined }}
+                href={`/dashboard/tablespaces/${alert.db_key}`}
+                style={{ textDecoration: 'none', display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '5px 0', borderBottom: i < recentAlerts.length - 1 ? '0.5px solid var(--bg4)' : undefined, cursor: 'pointer' }}
               >
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--cr)', flexShrink: 0, marginTop: '3px', display: 'inline-block' }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -253,7 +262,7 @@ export default async function DashboardPage() {
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--cr)', fontFamily: 'monospace', flexShrink: 0 }}>
                   {alert.pct.toFixed(1)}%
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

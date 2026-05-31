@@ -90,6 +90,46 @@ export async function sendBackupStatusAlert(data: {
   })
 }
 
+export async function sendRapidGrowthAlert(
+  date: string,
+  items: { db_name: string; ts_name: string; growth_gb: number }[],
+) {
+  const rows = items
+    .map(it => `<tr><td style="padding:6px 12px;font-family:monospace;font-size:12px;color:#c9d1d9;">${it.db_name}</td><td style="padding:6px 12px;font-family:monospace;font-size:12px;color:#c9d1d9;">${it.ts_name}</td><td style="padding:6px 12px;font-family:monospace;font-size:12px;color:#f85149;font-weight:600;">+${it.growth_gb.toFixed(1)} GB</td></tr>`)
+    .join('')
+
+  const to = await getAlertEmail()
+  await resend.emails.send({
+    from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
+    to,
+    subject: `⚠️ EM MONITOR: Rapid Tablespace Growth Detected — ${date} (${items.length} tablespace${items.length > 1 ? 's' : ''})`,
+    html: `
+      <div style="font-family:system-ui,sans-serif;background:#080c14;color:#c9d1d9;padding:24px;max-width:600px;">
+        <h1 style="font-size:20px;font-weight:500;color:#d29922;margin:0 0 8px;">Rapid Tablespace Growth</h1>
+        <p style="color:#8b949e;margin:0 0 16px;font-size:13px;">${date}</p>
+        <div style="background:#391e05;border:0.5px solid #d29922;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+          <p style="margin:0;font-size:13px;color:#d29922;">
+            ${items.length} tablespace${items.length > 1 ? 's have' : ' has'} grown significantly over the last 7 days.
+          </p>
+        </div>
+        <table style="width:100%;border-collapse:collapse;background:#0e1421;border-radius:8px;overflow:hidden;">
+          <thead>
+            <tr style="border-bottom:0.5px solid #1a2640;">
+              <th style="padding:8px 12px;text-align:left;font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px;">Database</th>
+              <th style="padding:8px 12px;text-align:left;font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px;">Tablespace</th>
+              <th style="padding:8px 12px;text-align:left;font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px;">7-day Growth</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <p style="font-size:11px;color:#3d5068;font-family:monospace;margin-top:20px;">
+          EM MONITOR Enterprise · Automated Alert
+        </p>
+      </div>
+    `,
+  })
+}
+
 export async function sendMissingBackupAlert(reportDate: string) {
   await resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
