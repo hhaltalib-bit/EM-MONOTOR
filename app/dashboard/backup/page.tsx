@@ -471,7 +471,6 @@ export default function BackupPage() {
             {[
               { label: 'Today (0d)',  count: healthy.length, color: G  },
               { label: '1–89 days',  count: delayed.length, color: A  },
-              { label: 'Failed',     count: failed.length,  color: R  },
               { label: '90+ days',   count: ignored.length, color: BD },
             ].map(dot => (
               <div key={dot.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -486,7 +485,6 @@ export default function BackupPage() {
                 <>
                   <div style={{ width: `${(healthy.length/total)*100}%`, background: G }} />
                   <div style={{ width: `${(delayed.length/total)*100}%`, background: A }} />
-                  <div style={{ width: `${(failed.length /total)*100}%`, background: R }} />
                   <div style={{ width: `${(ignored.length/total)*100}%`, background: BD }} />
                 </>
               )}

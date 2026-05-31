@@ -99,8 +99,8 @@ function classify(
   status: string | null,
   ageDays: number,
 ): 'healthy' | 'delayed' | 'failed' | 'ignored' {
-  if (status?.includes('FAILED')) return 'failed'
   if (ageDays > 90) return 'ignored'
+  if (status?.includes('FAILED')) return 'failed'
   if (ageDays >= 1) return 'delayed'
   return 'healthy'
 }
