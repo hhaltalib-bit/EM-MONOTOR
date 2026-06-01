@@ -8,7 +8,9 @@ async function getAlertEmail(): Promise<string> {
     const supabase = createServiceClient()
     const { data } = await supabase.from('system_settings').select('alert_email').limit(1).single()
     if (data?.alert_email) return data.alert_email
-  } catch { /* fall through */ }
+  } catch (err) {
+    console.error('[getAlertEmail] failed to read alert email from system_settings:', err)
+  }
   return process.env.ALERT_EMAIL_TO ?? ''
 }
 

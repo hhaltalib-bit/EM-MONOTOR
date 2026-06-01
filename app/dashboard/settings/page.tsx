@@ -112,7 +112,8 @@ export default function SettingsPage() {
       const { users: list, currentUserId: cid } = await res.json()
       setUsers(list ?? [])
       if (cid) setCurrentUserId(cid)
-    } catch {
+    } catch (err) {
+      console.error('[settings-loadUsers] failed to load users:', err)
       showMsg('Failed to load users', false)
     } finally {
       setUsersLoading(false)
@@ -190,7 +191,8 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error('Failed to save')
       setSettingsSaved(true)
       setTimeout(() => setSettingsSaved(false), 2000)
-    } catch {
+    } catch (err) {
+      console.error('[settings-save] failed to save settings:', err)
       setSettingsSaveError(true)
       setTimeout(() => setSettingsSaveError(false), 3000)
     }

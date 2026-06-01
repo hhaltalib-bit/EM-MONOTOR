@@ -28,17 +28,23 @@ export function ThresholdProvider({ children }: { children: ReactNode }) {
       const crit = parsed?.crit ?? 90
       if (!isNaN(warn) && warn >= 50 && warn <= 99) setWarnThresholdState(warn)
       if (!isNaN(crit) && crit >= 50 && crit <= 99) setCritThresholdState(crit)
-    } catch {}
+    } catch (err) {
+      console.error('[ThresholdContext] failed to read thresholds from localStorage:', err)
+    }
   }, [])
 
   const setWarnThreshold = (v: number) => {
     setWarnThresholdState(v)
-    try { localStorage.setItem('em_thresholds', JSON.stringify({ warn: v, crit: critThreshold })) } catch {}
+    try { localStorage.setItem('em_thresholds', JSON.stringify({ warn: v, crit: critThreshold })) } catch (err) {
+      console.error('[ThresholdContext] failed to write warn threshold to localStorage:', err)
+    }
   }
 
   const setCritThreshold = (v: number) => {
     setCritThresholdState(v)
-    try { localStorage.setItem('em_thresholds', JSON.stringify({ warn: warnThreshold, crit: v })) } catch {}
+    try { localStorage.setItem('em_thresholds', JSON.stringify({ warn: warnThreshold, crit: v })) } catch (err) {
+      console.error('[ThresholdContext] failed to write crit threshold to localStorage:', err)
+    }
   }
 
   return (

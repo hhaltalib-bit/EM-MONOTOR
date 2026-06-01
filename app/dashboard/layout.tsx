@@ -25,7 +25,8 @@ const getLatestBackupDate = cache(async (): Promise<string | null> => {
       .limit(1)
       .single()
     return data?.report_date ?? null
-  } catch {
+  } catch (err) {
+    console.error('[getLatestBackupDate] failed to fetch latest backup date:', err)
     return null
   }
 })
@@ -71,12 +72,14 @@ const getSummaries = cache(async (): Promise<DatabaseSummary[]> => {
               healthy_count: pcts.filter(p => p < 80).length,
               total_tablespaces: pcts.length,
             }
-          } catch {
+          } catch (err) {
+            console.error(`[getSummaries] failed to fetch data for ${reg.db_key}:`, err)
             return empty
           }
         })
       )
-    } catch {
+    } catch (err) {
+      console.error('[getSummaries] failed to fetch summaries:', err)
       return []
     }
 })

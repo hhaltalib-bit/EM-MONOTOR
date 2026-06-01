@@ -138,7 +138,8 @@ async function getOverviewData() {
         }
 
         return { summary, growing, largest, criticals }
-      } catch {
+      } catch (err) {
+        console.error(`[dashboard-overview] failed to fetch data for ${reg.db_key}:`, err)
         return empty
       }
     })

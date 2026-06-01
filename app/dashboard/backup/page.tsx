@@ -57,7 +57,10 @@ function fmtTime(iso: string | null): string {
   if (!iso) return ''
   try {
     return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  } catch { return '' }
+  } catch (err) {
+    console.error('[fmtTime] invalid date string:', err)
+    return ''
+  }
 }
 
 // ─── Donut SVG ───────────────────────────────────────────────────────────────

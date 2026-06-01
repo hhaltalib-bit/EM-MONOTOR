@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
       const body = await request.json()
       htmlContent = body.html
     }
-  } catch {
+  } catch (err) {
+    console.error('[ingest] failed to parse request body:', err)
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 

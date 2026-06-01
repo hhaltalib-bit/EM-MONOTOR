@@ -14,7 +14,8 @@ export const getThresholds = cache(async (): Promise<{ warn: number; crit: numbe
       warn: Number(data?.warn_threshold) || DEFAULT_WARN_THRESHOLD,
       crit: Number(data?.crit_threshold) || DEFAULT_CRIT_THRESHOLD,
     }
-  } catch {
+  } catch (err) {
+    console.error('[getThresholds] failed to fetch thresholds from system_settings:', err)
     return { warn: DEFAULT_WARN_THRESHOLD, crit: DEFAULT_CRIT_THRESHOLD }
   }
 })

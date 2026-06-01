@@ -117,7 +117,8 @@ export default function DbDetailPage() {
 
       setTablespaces(sortTablespaces(todayData as AnyTablespace[], schema))
       setLoading(false)
-    } catch {
+    } catch (err) {
+      console.error('[tablespace-detail] failed to fetch tablespace data:', err)
       setFetchError(true)
       setLoading(false)
     }

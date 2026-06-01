@@ -55,7 +55,8 @@ async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; 
           pct: row[pctField] as number,
           severity: ((row[pctField] as number) >= thresholds.crit ? 'critical' : 'warning') as 'critical' | 'warning',
         }))
-      } catch {
+      } catch (err) {
+        console.error(`[notifications] failed to fetch alerts for ${reg.db_key}:`, err)
         return [] as AlertEntry[]
       }
     })

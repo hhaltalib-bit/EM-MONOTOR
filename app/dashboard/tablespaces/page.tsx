@@ -53,7 +53,8 @@ async function getAllDatabases(): Promise<DatabaseSummary[]> {
         healthy_count: pcts.filter(p => p < thresholds.warn).length,
         total_tablespaces: pcts.length,
       })
-    } catch {
+    } catch (err) {
+      console.error(`[tablespaces-list] failed to fetch data for ${reg.db_key}:`, err)
       databases.push({ key: reg.db_key, name: reg.db_name, table_name: reg.table_name, schema_type: reg.schema_type, worst_pct: 0, severity: 'healthy', critical_count: 0, warning_count: 0, healthy_count: 0, total_tablespaces: 0})
     }
   }
