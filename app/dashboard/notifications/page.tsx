@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { DbRegistry } from '@/types'
 import { getLatestReportDate } from '@/lib/utils/getLatestReportDate'
+import { getThresholds } from '@/lib/utils/getThresholds'
 
 interface AlertEntry {
   db_key: string
@@ -23,6 +24,7 @@ interface HistoryEntry {
 
 async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; history: HistoryEntry[] }> {
   const supabase = createServiceClient()
+  const thresholds = await getThresholds()
 
   const reportDate = await getLatestReportDate()
 
@@ -43,14 +45,14 @@ async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; 
         const { data } = await (supabase.from(reg.table_name) as any)
           .select(`tablespace_name, ${pctField}`)
           .eq('report_date', reportDate)
-          .gte(pctField, 80)
+          .gte(pctField, thresholds.warn)
         if (!data?.length) return [] as AlertEntry[]
         return (data as Record<string, unknown>[]).map(row => ({
           db_key: reg.db_key,
           db_name: reg.db_name,
           tablespace_name: row.tablespace_name as string,
           pct: row[pctField] as number,
-          severity: ((row[pctField] as number) >= 90 ? 'critical' : 'warning') as 'critical' | 'warning',
+          severity: ((row[pctField] as number) >= thresholds.crit ? 'critical' : 'warning') as 'critical' | 'warning',
         }))
       } catch {
         return [] as AlertEntry[]

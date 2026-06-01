@@ -6,9 +6,11 @@ import { DatabaseSummary, DbRegistry } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'
 import { StatusDot } from '@/components/shared/StatusDot'
 import { RingChart } from '@/components/dashboard/RingChart'
+import { getThresholds } from '@/lib/utils/getThresholds'
 
 async function getAllDatabases(): Promise<DatabaseSummary[]> {
   const supabase = createServiceClient()
+  const thresholds = await getThresholds()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: latestRow } = await (supabase.from('raid_ts') as any)
     .select('report_date')
@@ -45,10 +47,10 @@ async function getAllDatabases(): Promise<DatabaseSummary[]> {
 
       databases.push({
         key: reg.db_key, name: reg.db_name, table_name: reg.table_name,
-        schema_type: reg.schema_type, worst_pct: worst, severity: getSeverity(worst),
-        critical_count: pcts.filter(p => p >= 90).length,
-        warning_count: pcts.filter(p => p >= 80 && p < 90).length,
-        healthy_count: pcts.filter(p => p < 80).length,
+        schema_type: reg.schema_type, worst_pct: worst, severity: getSeverity(worst, thresholds.warn, thresholds.crit),
+        critical_count: pcts.filter(p => p >= thresholds.crit).length,
+        warning_count: pcts.filter(p => p >= thresholds.warn && p < thresholds.crit).length,
+        healthy_count: pcts.filter(p => p < thresholds.warn).length,
         total_tablespaces: pcts.length,
       })
     } catch {

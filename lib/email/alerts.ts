@@ -9,7 +9,7 @@ async function getAlertEmail(): Promise<string> {
     const { data } = await supabase.from('system_settings').select('alert_email').limit(1).single()
     if (data?.alert_email) return data.alert_email
   } catch { /* fall through */ }
-  return process.env.ALERT_EMAIL_TO || 'hassan.haider@onyxes.com'
+  return process.env.ALERT_EMAIL_TO ?? ''
 }
 
 export async function sendMissingReportAlert() {
@@ -131,9 +131,10 @@ export async function sendRapidGrowthAlert(
 }
 
 export async function sendMissingBackupAlert(reportDate: string) {
+  const to = await getAlertEmail()
   await resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
-    to:   process.env.ALERT_EMAIL_TO   || 'hassan.haider@onyxes.com',
+    to,
     subject: `⚠️ EM MONITOR: RMAN Backup Report NOT received — ${reportDate}`,
     html: `
       <div style="font-family:system-ui,sans-serif;background:#080c14;color:#c9d1d9;padding:24px;max-width:600px;">

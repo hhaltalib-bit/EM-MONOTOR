@@ -22,12 +22,15 @@ export async function GET() {
     alert_email: data?.alert_email ?? '',
     expected_report_time: data?.expected_report_time ?? '01:30',
     missing_alert_delay: data?.missing_alert_delay ?? 30,
+    warn_threshold: data?.warn_threshold ?? 80,
+    crit_threshold: data?.crit_threshold ?? 90,
   })
 }
 
 const ALLOWED_KEYS = [
   'alert_email', 'expected_report_time',
   'missing_alert_delay', 'rapid_growth_threshold_gb',
+  'warn_threshold', 'crit_threshold',
 ]
 
 export async function POST(req: NextRequest) {
@@ -66,6 +69,20 @@ export async function POST(req: NextRequest) {
   if (body.expected_report_time !== undefined) {
     if (typeof body.expected_report_time !== 'string' || !/^\d{2}:\d{2}$/.test(body.expected_report_time)) {
       return NextResponse.json({ error: 'expected_report_time must match HH:MM format' }, { status: 400 })
+    }
+  }
+
+  if (body.warn_threshold !== undefined) {
+    const v = Number(body.warn_threshold)
+    if (!Number.isFinite(v) || v < 50 || v > 99) {
+      return NextResponse.json({ error: 'warn_threshold must be a number between 50 and 99' }, { status: 400 })
+    }
+  }
+
+  if (body.crit_threshold !== undefined) {
+    const v = Number(body.crit_threshold)
+    if (!Number.isFinite(v) || v < 50 || v > 99) {
+      return NextResponse.json({ error: 'crit_threshold must be a number between 50 and 99' }, { status: 400 })
     }
   }
 

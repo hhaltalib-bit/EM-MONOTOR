@@ -10,6 +10,7 @@ import { RefreshButton } from '@/components/dashboard/RefreshButton'
 import { DatabaseSummary, DbRegistry, TopGrowing } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'
 import { sortDatabases } from '@/lib/utils/sort'
+import { getThresholds } from '@/lib/utils/getThresholds'
 
 interface RecentAlert {
   db_key: string
@@ -21,6 +22,7 @@ interface RecentAlert {
 
 async function getOverviewData() {
   const supabase = createServiceClient()
+  const thresholds = await getThresholds()
 
   // Use the most recent report date that has data, not necessarily today
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,10 +86,10 @@ async function getOverviewData() {
 
         const summary: DatabaseSummary = {
           key: reg.db_key, name: reg.db_name, table_name: reg.table_name,
-          schema_type: reg.schema_type, worst_pct: worst, severity: getSeverity(worst),
-          critical_count: pcts.filter(p => p >= 90).length,
-          warning_count: pcts.filter(p => p >= 80 && p < 90).length,
-          healthy_count: pcts.filter(p => p < 80).length,
+          schema_type: reg.schema_type, worst_pct: worst, severity: getSeverity(worst, thresholds.warn, thresholds.crit),
+          critical_count: pcts.filter(p => p >= thresholds.crit).length,
+          warning_count: pcts.filter(p => p >= thresholds.warn && p < thresholds.crit).length,
+          healthy_count: pcts.filter(p => p < thresholds.warn).length,
           total_tablespaces: pcts.length,
         }
 
@@ -102,7 +104,7 @@ async function getOverviewData() {
 
         // Critical tablespaces for Recent Alerts panel
         const criticals: RecentAlert[] = (todayData as Record<string, unknown>[])
-          .filter(row => (row[pctField] as number) >= 90)
+          .filter(row => (row[pctField] as number) >= thresholds.crit)
           .map(row => ({
             db_key: reg.db_key,
             db_name: reg.db_name,

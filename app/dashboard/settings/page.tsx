@@ -93,6 +93,8 @@ export default function SettingsPage() {
         if (d.alert_email !== undefined) setAlertEmail(d.alert_email)
         if (d.expected_report_time !== undefined) setReportTime(d.expected_report_time)
         if (d.missing_alert_delay !== undefined) setAlertDelay(String(d.missing_alert_delay))
+        if (d.warn_threshold !== undefined) setWarnThreshold(Number(d.warn_threshold))
+        if (d.crit_threshold !== undefined) setCritThreshold(Number(d.crit_threshold))
       })
       .catch(() => {})
   }, [])
@@ -181,6 +183,8 @@ export default function SettingsPage() {
           alert_email: alertEmail,
           expected_report_time: reportTime,
           missing_alert_delay: Number(alertDelay),
+          warn_threshold: warnThreshold,
+          crit_threshold: critThreshold,
         }),
       })
       if (!res.ok) throw new Error('Failed to save')
