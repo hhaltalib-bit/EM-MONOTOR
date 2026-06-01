@@ -17,7 +17,9 @@ export async function GET() {
   if (!auth.ok) return auth.response
 
   const svc = createServiceClient()
-  const { data } = await svc.from('system_settings').select('*').limit(1).single()
+  const { data } = await svc.from('system_settings')
+    .select('alert_email, expected_report_time, missing_alert_delay, warn_threshold, crit_threshold')
+    .limit(1).single()
 
   return NextResponse.json({
     alert_email: data?.alert_email ?? '',

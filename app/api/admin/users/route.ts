@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profiles } = await (svc.from('user_profiles') as any).select('*')
+  const { data: profiles } = await (svc.from('user_profiles') as any).select('user_id, role, display_name')
   const profileMap = new Map(((profiles ?? []) as Record<string, unknown>[]).map(p => [p.user_id as string, p]))
 
   const users = authData.users.map(u => ({
