@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/utils/rateLimit'
+import { requireAuth } from '@/lib/auth/requireAuth'
 
 export async function GET(_req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(true)
+  if (!auth.ok) return auth.response
 
   const svc = createServiceClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: callerProfile } = await (svc.from('user_profiles') as any)
-    .select('role').eq('user_id', user.id).single()
-  if (callerProfile?.role !== 'Admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
   const { data: authData, error } = await svc.auth.admin.listUsers({ perPage: 200 })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -31,7 +23,7 @@ export async function GET(_req: NextRequest) {
     display_name: (profileMap.get(u.id) as Record<string, unknown> | undefined)?.display_name ?? u.email?.split('@')[0] ?? '',
   }))
 
-  return NextResponse.json({ users, currentUserId: user.id })
+  return NextResponse.json({ users, currentUserId: auth.user.id })
 }
 
 export async function POST(req: NextRequest) {
@@ -41,15 +33,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(true)
+  if (!auth.ok) return auth.response
 
   const svc = createServiceClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: callerProfile } = await (svc.from('user_profiles') as any).select('role').eq('user_id', user.id).single()
-  if (callerProfile?.role !== 'Admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
   const { email, password, role, display_name } = await req.json() as {
     email: string; password: string; role?: string; display_name?: string
   }

@@ -8,12 +8,12 @@
 // INSERT INTO system_settings (id) VALUES (1) ON CONFLICT DO NOTHING;
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/auth/requireAuth'
 
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(false)
+  if (!auth.ok) return auth.response
 
   const svc = createServiceClient()
   const { data } = await svc.from('system_settings').select('*').limit(1).single()
@@ -34,9 +34,8 @@ const ALLOWED_KEYS = [
 ]
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(false)
+  if (!auth.ok) return auth.response
 
   const body = await req.json() as Record<string, unknown>
 

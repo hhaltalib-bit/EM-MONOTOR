@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { DbRegistry } from '@/types'
+import { requireAuth } from '@/lib/auth/requireAuth'
 
 export async function GET(request: NextRequest) {
-  // Require authenticated session
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(false)
+  if (!auth.ok) return auth.response
 
   const dbKey = request.nextUrl.searchParams.get('db_key')
   if (!dbKey) return NextResponse.json({ error: 'Missing db_key' }, { status: 400 })

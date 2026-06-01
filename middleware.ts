@@ -2,7 +2,17 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Routes that authenticate via CRON_SECRET — skip session check
+const CRON_PATHS = ['/api/cron', '/api/cron-backup', '/api/ingest']
+
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname
+
+  // Skip session validation for secret-authenticated cron/ingest routes
+  if (CRON_PATHS.some(p => path.startsWith(p))) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -30,13 +40,19 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isLoginPage = request.nextUrl.pathname === '/login'
-  const isDashboard = request.nextUrl.pathname.startsWith('/dashboard')
+  const isLoginPage = path === '/login'
+  const isDashboard = path.startsWith('/dashboard')
+  const isProtectedApi = path.startsWith('/api/')
 
+  // Unauthenticated: redirect dashboard pages to login, return 401 for API routes
   if (!user && isDashboard) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
+  if (!user && isProtectedApi) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
+  // Already logged in: redirect login page to dashboard
   if (user && isLoginPage) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
@@ -45,5 +61,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: ['/dashboard/:path*', '/login', '/api/:path*'],
 }
