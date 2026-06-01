@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
@@ -13,7 +14,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 // Returns the most recent report_date from backup_status
-async function getLatestBackupDate(): Promise<string | null> {
+const getLatestBackupDate = cache(async (): Promise<string | null> => {
   try {
     const supabase = createServiceClient()
     const { data } = await supabase
@@ -26,10 +27,10 @@ async function getLatestBackupDate(): Promise<string | null> {
   } catch {
     return null
   }
-}
+})
 
 // All 20 DB queries run in parallel, service client bypasses RLS
-async function getSummaries(): Promise<DatabaseSummary[]> {
+const getSummaries = cache(async (): Promise<DatabaseSummary[]> => {
     try {
       const supabase = createServiceClient()
 
@@ -77,7 +78,7 @@ async function getSummaries(): Promise<DatabaseSummary[]> {
     } catch {
       return []
     }
-}
+})
 
 export default async function DashboardLayout({
   children,

@@ -42,7 +42,9 @@ async function logToDb(status: string, reportDate: string | null, reportTime: st
   try {
     const supabase = createServiceClient()
     await supabase.from('report_log').insert({ status, report_date: reportDate, report_time: reportTime, databases_processed: dbsProcessed, total_rows_inserted: rowsInserted, error_message: errorMessage })
-  } catch { /* non-critical */ }
+  } catch (err) {
+    console.error('[cron-log] failed to write report_log:', err)
+  }
 }
 
 

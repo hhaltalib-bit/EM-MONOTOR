@@ -169,7 +169,9 @@ export async function POST(request: NextRequest) {
       if (rapidItems.length > 0) {
         await sendRapidGrowthAlert(parsed.report_date, rapidItems)
       }
-    } catch { /* non-critical */ }
+    } catch (err) {
+      console.error('[rapid-growth-check] failed:', err)
+    }
   }
 
   return NextResponse.json({
@@ -197,5 +199,7 @@ async function logIngest(data: {
   try {
     const supabase = createServiceClient()
     await supabase.from('report_log').insert(data)
-  } catch { /* non-critical */ }
+  } catch (err) {
+    console.error('[ingest-log] failed to write report_log:', err)
+  }
 }

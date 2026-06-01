@@ -227,26 +227,24 @@ export async function parseBackupReport(
     }
   }
 
-  // UPSERT into backup_status — ON CONFLICT DO NOTHING
-  for (const row of rows) {
-    await supabase.from('backup_status').upsert(
-      {
-        report_date:    reportDate,
-        db_key:         row.db_key,
-        db_name:        row.db_name,
-        backup_type:    row.backup_type,
-        start_time:     row.start_time,
-        end_time:       row.end_time,
-        status:         row.status,
-        time_taken:     row.time_taken,
-        output_gb:      row.output_gb,
-        output_device:  row.output_device,
-        age_days:       row.age_days,
-        classification: row.classification,
-      },
-      { onConflict: 'report_date,db_key', ignoreDuplicates: true }
-    )
-  }
+  // Bulk UPSERT — single round trip instead of one per row
+  await supabase.from('backup_status').upsert(
+    rows.map(row => ({
+      report_date:    reportDate,
+      db_key:         row.db_key,
+      db_name:        row.db_name,
+      backup_type:    row.backup_type,
+      start_time:     row.start_time,
+      end_time:       row.end_time,
+      status:         row.status,
+      time_taken:     row.time_taken,
+      output_gb:      row.output_gb,
+      output_device:  row.output_device,
+      age_days:       row.age_days,
+      classification: row.classification,
+    })),
+    { onConflict: 'report_date,db_key', ignoreDuplicates: true }
+  )
 
   const healthyCount = rows.filter(r => r.classification === 'healthy').length
   const delayedCount = rows.filter(r => r.classification === 'delayed').length

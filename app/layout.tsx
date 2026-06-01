@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/shared/ThemeProvider";
 import "./globals.css";
+import "@tabler/icons-webfont/dist/tabler-icons.min.css";
 
 export const metadata: Metadata = {
   title: "EM MONITOR",
@@ -18,7 +19,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="manifest" href="/manifest.json" />
       </head>
