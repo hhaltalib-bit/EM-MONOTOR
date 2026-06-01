@@ -56,6 +56,11 @@ export async function GET(req: NextRequest) {
     const supabase = createServiceClient()
     const dateParam = req.nextUrl.searchParams.get('date')
 
+    // SEC-M: validate date format before use
+    if (dateParam && !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
+    }
+
     let reportDate: string
     if (dateParam) {
       reportDate = dateParam

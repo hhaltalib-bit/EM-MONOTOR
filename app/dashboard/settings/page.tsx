@@ -304,7 +304,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label style={labelStyle}>Password</label>
-                <input style={inputStyle} type="password" required minLength={6} placeholder="Min 6 characters" value={addForm.password} onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} />
+                <input style={inputStyle} type="password" required minLength={12} placeholder="Min 12 characters" value={addForm.password} onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} />
               </div>
             </div>
             <div style={{ marginBottom: '12px' }}>
@@ -379,8 +379,8 @@ export default function SettingsPage() {
                         style={inputStyle}
                         type="password"
                         required
-                        minLength={6}
-                        placeholder="Min 6 characters"
+                        minLength={12}
+                        placeholder="Min 12 characters"
                         value={pwdForm.password}
                         onChange={e => setPwdForm(f => f ? { ...f, password: e.target.value, error: '' } : null)}
                         autoFocus

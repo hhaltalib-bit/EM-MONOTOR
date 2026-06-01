@@ -4,6 +4,7 @@ import { parseBackupReport } from '@/lib/parser/backup-parser'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendBackupStatusAlert, sendMissingBackupAlert } from '@/lib/email/alerts'
 import { getOAuth2Client, findHtmlContent } from '@/lib/gmail/gmail-client'
+import { secureCompare } from '@/lib/utils/secureCompare'
 
 async function logBackupReport(
   reportDate: string,
@@ -80,7 +81,7 @@ async function parseAndStoreBackup(html: string, reportDate: string, notes: stri
 // POST — called by Google Apps Script with { html: '...' }
 export async function POST(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  if (!secret || !secureCompare(secret, process.env.CRON_SECRET ?? '')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -90,6 +91,11 @@ export async function POST(request: NextRequest) {
 
     if (!html) {
       return NextResponse.json({ error: 'No HTML provided' }, { status: 400 })
+    }
+
+    // SEC-H-04: reject payloads larger than 1 MB
+    if (html.length > 1_000_000) {
+      return NextResponse.json({ success: false, reason: 'payload_too_large' }, { status: 413 })
     }
 
     const reportDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' })
@@ -114,7 +120,8 @@ export async function POST(request: NextRequest) {
 // GET — internal cron that fetches from Gmail directly
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!token || !secureCompare(token, process.env.CRON_SECRET ?? '')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -3,10 +3,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { parseHtmlReport } from '@/lib/parser/html-parser'
 import { ParsedStandardRow, ParsedDwhRow } from '@/types'
 import { sendRapidGrowthAlert } from '@/lib/email/alerts'
+import { secureCompare } from '@/lib/utils/secureCompare'
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  if (!secret || !secureCompare(secret, process.env.CRON_SECRET ?? '')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -27,10 +28,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  // SEC-H-04: reject payloads larger than 1 MB
+  if (!htmlContent || htmlContent.length > 1_000_000) {
+    return NextResponse.json({ success: false, reason: 'payload_too_large' }, { status: 413 })
+  }
+
   const skipDateValidation = request.nextUrl.searchParams.get('test') === '1'
 
   const parsed = parseHtmlReport(htmlContent, skipDateValidation)
-  console.log('Parser result:', JSON.stringify({ valid: parsed.valid, reason: (parsed as {reason?: string}).reason, report_date: (parsed as {report_date?: string}).report_date, databases: (parsed as {databases?: unknown[]}).databases?.length }))
 
   if (!parsed.valid) {
     await logIngest({ status: 'skipped', error_message: `Validation failed: ${parsed.reason}` })
@@ -109,7 +114,6 @@ export async function POST(request: NextRequest) {
   // Count critical/warning tablespaces so the caller (Google Apps Script) can decide on alerts
   let criticalCount = 0
   let warningCount = 0
-  const criticalDbs: string[] = []
 
   if (parsed.report_date && dbsProcessed > 0) {
     for (const reg of (registries || [])) {
@@ -129,7 +133,6 @@ export async function POST(request: NextRequest) {
 
       criticalCount += crit.length
       warningCount += warn.length
-      if (crit.length > 0) criticalDbs.push(reg.db_name || reg.db_key)
     }
   }
 
@@ -174,6 +177,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // SEC-H-02: do not expose database names in the response
   return NextResponse.json({
     success: true,
     report_date: parsed.report_date,
@@ -182,7 +186,6 @@ export async function POST(request: NextRequest) {
     total_rows_inserted: totalInserted,
     critical_count: criticalCount,
     warning_count: warningCount,
-    critical_dbs: criticalDbs,
     errors: errors.length > 0 ? errors : undefined,
   })
 }

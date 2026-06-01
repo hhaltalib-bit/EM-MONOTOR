@@ -45,9 +45,16 @@ export async function PATCH(
 
   const { id } = await params
   const { password } = await req.json() as { password: string }
-  if (!password || password.length < 6) return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
+  if (!password || password.length < 12) return NextResponse.json({ error: 'Password must be at least 12 characters' }, { status: 400 })
   const { error } = await svc.auth.admin.updateUserById(id, { password })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // SEC-H-03: invalidate all existing sessions for this user
+  try {
+    await svc.auth.admin.signOut(id, 'global')
+  } catch (err) {
+    console.error('[admin-patch] session invalidation failed:', err)
+  }
 
   return NextResponse.json({ success: true })
 }

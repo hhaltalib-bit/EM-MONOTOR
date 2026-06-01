@@ -2,10 +2,12 @@
 import { fetchTodayReport } from '@/lib/gmail/gmail-client'
 import { sendMissingReportAlert } from '@/lib/email/alerts'
 import { createServiceClient } from '@/lib/supabase/server'
+import { secureCompare } from '@/lib/utils/secureCompare'
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!token || !secureCompare(token, process.env.CRON_SECRET ?? '')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
