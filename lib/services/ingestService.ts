@@ -3,6 +3,8 @@ import { parseHtmlReport } from '@/lib/parser/html-parser'
 import { ParsedStandardRow, ParsedDwhRow } from '@/types'
 import { sendRapidGrowthAlert } from '@/lib/email/alerts'
 import { safeFrom } from '@/lib/db/safeTable'
+import { getThresholds } from '@/lib/utils/getThresholds'
+import { RAPID_GROWTH_DEFAULT_GB, GROWTH_WINDOW_DAYS, MS_PER_DAY } from '@/lib/constants'
 
 export interface IngestResult {
   success: boolean
@@ -28,6 +30,7 @@ export async function processIngest(
   }
 
   const supabase = createServiceClient()
+  const thresholds = await getThresholds()
 
   const { data: registries } = await supabase
     .from('db_registry')
@@ -41,6 +44,8 @@ export async function processIngest(
 
   let totalInserted = 0
   let dbsProcessed = 0
+  let criticalCount = 0
+  let warningCount = 0
   const errors: string[] = []
 
   for (const db of parsed.databases!) {
@@ -66,6 +71,13 @@ export async function processIngest(
         const { error } = await tb.upsert(rows, { onConflict: 'report_date,tablespace_name', ignoreDuplicates: true })
         if (error) throw new Error(error.message)
         totalInserted += rows.length
+
+        // Count in-memory — no second DB query needed
+        for (const row of rows) {
+          const pct = row.max_ts_pct_used
+          if (pct >= thresholds.crit) criticalCount++
+          else if (pct >= thresholds.warn) warningCount++
+        }
       } else {
         const rows = (db.tablespaces as ParsedDwhRow[]).map(ts => ({
           report_date: parsed.report_date,
@@ -78,6 +90,13 @@ export async function processIngest(
         const { error } = await tb.upsert(rows, { onConflict: 'report_date,tablespace_name', ignoreDuplicates: true })
         if (error) throw new Error(error.message)
         totalInserted += rows.length
+
+        // Count in-memory — no second DB query needed
+        for (const row of rows) {
+          const pct = row.percent_used
+          if (pct >= thresholds.crit) criticalCount++
+          else if (pct >= thresholds.warn) warningCount++
+        }
       }
       dbsProcessed++
     } catch (err) {
@@ -95,31 +114,7 @@ export async function processIngest(
     notes: `Ingested ${dbsProcessed} databases, ${totalInserted} rows`,
   })
 
-  // Count critical/warning tablespaces for the caller
-  let criticalCount = 0
-  let warningCount = 0
-
-  if (parsed.report_date && dbsProcessed > 0) {
-    for (const reg of (registries || [])) {
-      const pctField = reg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
-      const { data } = await safeFrom(supabase, reg.table_name)
-        .select(`tablespace_name, ${pctField}`)
-        .eq('report_date', parsed.report_date)
-
-      if (!data?.length) continue
-
-      const crit = (data as Record<string, unknown>[]).filter(r => (r[pctField] as number) >= 90)
-      const warn = (data as Record<string, unknown>[]).filter(r => {
-        const p = r[pctField] as number
-        return p >= 80 && p < 90
-      })
-
-      criticalCount += crit.length
-      warningCount += warn.length
-    }
-  }
-
-  // Check for rapid growth over 7-day window
+  // Check for rapid growth over GROWTH_WINDOW_DAYS-day window
   if (parsed.report_date && dbsProcessed > 0) {
     try {
       const { data: settingsRow } = await supabase
@@ -127,8 +122,8 @@ export async function processIngest(
         .select('rapid_growth_threshold_gb')
         .limit(1)
         .single()
-      const threshold = parseFloat((settingsRow as Record<string, string> | null)?.rapid_growth_threshold_gb ?? '50') || 50
-      const sevenDaysAgo = new Date(new Date(parsed.report_date).getTime() - 7 * 86400000).toISOString().split('T')[0]
+      const threshold = parseFloat((settingsRow as Record<string, string> | null)?.rapid_growth_threshold_gb ?? String(RAPID_GROWTH_DEFAULT_GB)) || RAPID_GROWTH_DEFAULT_GB
+      const windowAgo = new Date(new Date(parsed.report_date).getTime() - GROWTH_WINDOW_DAYS * MS_PER_DAY).toISOString().split('T')[0]
       const rapidItems: { db_name: string; ts_name: string; growth_gb: number }[] = []
 
       for (const reg of (registries || [])) {
@@ -136,7 +131,7 @@ export async function processIngest(
         const tb = safeFrom(supabase, reg.table_name)
         const [{ data: todayGb }, { data: weekAgoGb }] = await Promise.all([
           tb.select(`tablespace_name, ${usedField}`).eq('report_date', parsed.report_date),
-          tb.select(`tablespace_name, ${usedField}`).eq('report_date', sevenDaysAgo),
+          tb.select(`tablespace_name, ${usedField}`).eq('report_date', windowAgo),
         ])
         if (!todayGb?.length || !weekAgoGb?.length) continue
         const weekMap = new Map(
