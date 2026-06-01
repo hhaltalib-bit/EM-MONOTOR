@@ -36,6 +36,7 @@ const getSummaries = cache(async (): Promise<DatabaseSummary[]> => {
       const supabase = createServiceClient()
 
       const reportDate = await getLatestReportDate()
+      if (!reportDate) return []
 
       const { data: registries } = await supabase
         .from('db_registry')

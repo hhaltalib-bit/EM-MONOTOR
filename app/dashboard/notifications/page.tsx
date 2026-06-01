@@ -36,6 +36,7 @@ async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; 
     (supabase.from('backup_report_log') as any).select('report_date, status, databases_count').order('report_date', { ascending: false }).limit(30),
   ])
 
+  if (!reportDate) return { alerts: [], reportDate: '', history: [] }
   if (!registries?.length) return { alerts: [], reportDate, history: [] }
 
   const results = await Promise.all(
