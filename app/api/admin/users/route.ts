@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/utils/rateLimit'
 import { requireAuth } from '@/lib/auth/requireAuth'
+import { writeAudit } from '@/lib/utils/auditLog'
 
 export async function GET(_req: NextRequest) {
   const auth = await requireAuth(true)
@@ -57,6 +58,8 @@ export async function POST(req: NextRequest) {
     role: role ?? 'DBA',
     display_name: display_name ?? email.split('@')[0],
   })
+
+  await writeAudit({ actorId: auth.user.id, actorEmail: auth.user.email, action: 'user.create', target: email, ip })
 
   return NextResponse.json({ user: { id: newUser.id, email, role: role ?? 'DBA', display_name: display_name ?? email.split('@')[0] } })
 }

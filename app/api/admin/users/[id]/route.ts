@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/utils/rateLimit'
 import { requireAuth } from '@/lib/auth/requireAuth'
+import { writeAudit } from '@/lib/utils/auditLog'
 
 export async function DELETE(
   req: NextRequest,
@@ -21,6 +22,8 @@ export async function DELETE(
   if (id === auth.user.id) return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
   const { error } = await svc.auth.admin.deleteUser(id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await writeAudit({ actorId: auth.user.id, actorEmail: auth.user.email, action: 'user.delete', target: id, ip })
 
   return NextResponse.json({ success: true })
 }
@@ -45,6 +48,9 @@ export async function PATCH(
   } catch (err) {
     console.error('[admin-patch] session invalidation failed:', err)
   }
+
+  const ip = req.headers.get('x-forwarded-for') ?? undefined
+  await writeAudit({ actorId: auth.user.id, actorEmail: auth.user.email, action: 'user.password_change', target: id, ip })
 
   return NextResponse.json({ success: true })
 }

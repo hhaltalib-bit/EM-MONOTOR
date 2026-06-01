@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth/requireAuth'
+import { writeAudit } from '@/lib/utils/auditLog'
 
 export async function GET() {
   const auth = await requireAuth(false)
@@ -88,6 +89,9 @@ export async function POST(req: NextRequest) {
   const svc = createServiceClient()
   const { error } = await svc.from('system_settings').upsert({ id: 1, ...body })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const ip = req.headers.get('x-forwarded-for') ?? undefined
+  await writeAudit({ actorId: auth.user.id, actorEmail: auth.user.email, action: 'settings.update', ip })
 
   return NextResponse.json({ success: true })
 }
