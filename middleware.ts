@@ -2,8 +2,14 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Routes that authenticate via CRON_SECRET — skip session check
-const CRON_PATHS = ['/api/cron', '/api/cron-backup', '/api/ingest']
+// Routes that skip session auth (use CRON_SECRET or are public monitoring endpoints)
+const CRON_PATHS = [
+  '/api/cron',
+  '/api/cron-backup',
+  '/api/ingest',
+  '/api/health',
+  '/api/cron-healthcheck',
+]
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
