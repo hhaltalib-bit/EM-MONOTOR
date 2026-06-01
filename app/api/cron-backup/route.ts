@@ -5,6 +5,7 @@ import { sendBackupStatusAlert, sendMissingBackupAlert } from '@/lib/email/alert
 import { getOAuth2Client, findHtmlContent } from '@/lib/gmail/gmail-client'
 import { secureCompare } from '@/lib/utils/secureCompare'
 import { parseAndStoreBackup } from '@/lib/services/backupService'
+import { MAX_HTML_BYTES } from '@/lib/constants'
 
 async function logBackupReport(
   reportDate: string,
@@ -79,8 +80,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No HTML provided' }, { status: 400 })
     }
 
-    // SEC-H-04: reject payloads larger than 1 MB
-    if (html.length > 1_000_000) {
+    if (html.length > MAX_HTML_BYTES) {
       return NextResponse.json({ success: false, reason: 'payload_too_large' }, { status: 413 })
     }
 

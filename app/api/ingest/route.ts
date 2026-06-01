@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { secureCompare } from '@/lib/utils/secureCompare'
 import { processIngest } from '@/lib/services/ingestService'
+import { MAX_HTML_BYTES } from '@/lib/constants'
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
@@ -25,8 +26,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  // SEC-H-04: reject payloads larger than 1 MB
-  if (!htmlContent || htmlContent.length > 1_000_000) {
+  if (!htmlContent || htmlContent.length > MAX_HTML_BYTES) {
     return NextResponse.json({ success: false, reason: 'payload_too_large' }, { status: 413 })
   }
 
