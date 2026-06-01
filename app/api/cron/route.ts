@@ -1,8 +1,9 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { fetchTodayReport } from '@/lib/gmail/gmail-client'
 import { sendMissingReportAlert } from '@/lib/email/alerts'
 import { createServiceClient } from '@/lib/supabase/server'
 import { secureCompare } from '@/lib/utils/secureCompare'
+import { processIngest } from '@/lib/services/ingestService'
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -22,17 +23,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, reason: 'report_not_found' })
     }
 
-    const ingestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/ingest${isForced ? '?test=1' : ''}`
-    const ingestResponse = await fetch(ingestUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-cron-secret': process.env.CRON_SECRET! },
-      body: JSON.stringify({ html: result.content }),
-    })
+    // SEC-C-04: call processIngest directly instead of HTTP self-call (removes SSRF risk)
+    const ingestResult = await processIngest(result.content, isForced)
 
-    const ingestText = await ingestResponse.text()
-    const ingestData = JSON.parse(ingestText)
-
-    return NextResponse.json({ success: true, gmail_message_id: result.messageId, ingest_result: ingestData })
+    return NextResponse.json({ success: true, gmail_message_id: result.messageId, ingest_result: ingestResult })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     await logToDb('error', null, null, 0, 0, msg)
@@ -48,5 +42,3 @@ async function logToDb(status: string, reportDate: string | null, reportTime: st
     console.error('[cron-log] failed to write report_log:', err)
   }
 }
-
-
