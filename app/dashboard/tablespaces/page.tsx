@@ -7,6 +7,7 @@ import { getSeverity } from '@/lib/utils/severity'
 import { StatusDot } from '@/components/shared/StatusDot'
 import { RingChart } from '@/components/dashboard/RingChart'
 import { getThresholds } from '@/lib/utils/getThresholds'
+import { safeFrom } from '@/lib/db/safeTable'
 
 async function getAllDatabases(): Promise<DatabaseSummary[]> {
   const supabase = createServiceClient()
@@ -32,8 +33,7 @@ async function getAllDatabases(): Promise<DatabaseSummary[]> {
   for (const reg of registries as DbRegistry[]) {
     try {
       const pctField = reg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase.from(reg.table_name) as any)
+      const { data } = await safeFrom(supabase, reg.table_name)
         .select(pctField)
         .eq('report_date', today)
 

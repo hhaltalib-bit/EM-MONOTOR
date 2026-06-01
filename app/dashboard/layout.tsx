@@ -9,6 +9,7 @@ import { DatabaseSummary, DbRegistry } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'
 import { sortDatabases } from '@/lib/utils/sort'
 import { getLatestReportDate } from '@/lib/utils/getLatestReportDate'
+import { safeFrom } from '@/lib/db/safeTable'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -52,8 +53,7 @@ const getSummaries = cache(async (): Promise<DatabaseSummary[]> => {
           }
           try {
             const pctField = reg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { data } = await (supabase.from(reg.table_name) as any)
+            const { data } = await safeFrom(supabase, reg.table_name)
               .select(pctField)
               .eq('report_date', reportDate)
 

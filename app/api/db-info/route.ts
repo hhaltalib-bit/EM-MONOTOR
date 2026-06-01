@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { DbRegistry } from '@/types'
 import { requireAuth } from '@/lib/auth/requireAuth'
+import { safeFrom } from '@/lib/db/safeTable'
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(false)
@@ -22,8 +23,7 @@ export async function GET(request: NextRequest) {
 
   const regTyped = reg as unknown as DbRegistry
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: latest } = await (svc.from(regTyped.table_name) as any)
+  const { data: latest } = await safeFrom(svc, regTyped.table_name)
     .select('report_date')
     .order('report_date', { ascending: false })
     .limit(1)

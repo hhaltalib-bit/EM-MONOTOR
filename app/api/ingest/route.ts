@@ -4,6 +4,7 @@ import { parseHtmlReport } from '@/lib/parser/html-parser'
 import { ParsedStandardRow, ParsedDwhRow } from '@/types'
 import { sendRapidGrowthAlert } from '@/lib/email/alerts'
 import { secureCompare } from '@/lib/utils/secureCompare'
+import { safeFrom } from '@/lib/db/safeTable'
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
@@ -63,8 +64,7 @@ export async function POST(request: NextRequest) {
     if (!reg) { errors.push(`Unknown db_key: ${db.db_key}`); continue }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tb = supabase.from(reg.table_name) as any
+      const tb = safeFrom(supabase, reg.table_name)
 
       if (db.schema_type === 'standard') {
         const rows = (db.tablespaces as ParsedStandardRow[]).map(ts => ({
@@ -118,8 +118,7 @@ export async function POST(request: NextRequest) {
   if (parsed.report_date && dbsProcessed > 0) {
     for (const reg of (registries || [])) {
       const pctField = reg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase.from(reg.table_name) as any)
+      const { data } = await safeFrom(supabase, reg.table_name)
         .select(`tablespace_name, ${pctField}`)
         .eq('report_date', parsed.report_date)
 
@@ -150,8 +149,7 @@ export async function POST(request: NextRequest) {
 
       for (const reg of (registries || [])) {
         const usedField = reg.schema_type === 'standard' ? 'used_ts_size' : 'gb_used'
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const tb = supabase.from(reg.table_name) as any
+        const tb = safeFrom(supabase, reg.table_name)
         const [{ data: todayGb }, { data: weekAgoGb }] = await Promise.all([
           tb.select(`tablespace_name, ${usedField}`).eq('report_date', parsed.report_date),
           tb.select(`tablespace_name, ${usedField}`).eq('report_date', sevenDaysAgo),

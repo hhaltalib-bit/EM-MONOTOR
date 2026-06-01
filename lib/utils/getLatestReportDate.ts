@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { safeFrom } from '@/lib/db/safeTable'
 
 const FALLBACK_TABLES = ['raid_ts', 'dwh_ts', 'prod1_ts', 'inhouse_ts']
 
@@ -6,8 +7,7 @@ export async function getLatestReportDate(): Promise<string> {
   const supabase = createServiceClient()
   for (const table of FALLBACK_TABLES) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase.from(table) as any)
+      const { data } = await safeFrom(supabase, table)
         .select('report_date')
         .order('report_date', { ascending: false })
         .limit(1)

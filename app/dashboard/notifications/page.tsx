@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { DbRegistry } from '@/types'
 import { getLatestReportDate } from '@/lib/utils/getLatestReportDate'
 import { getThresholds } from '@/lib/utils/getThresholds'
+import { safeFrom } from '@/lib/db/safeTable'
 
 interface AlertEntry {
   db_key: string
@@ -41,8 +42,7 @@ async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; 
     (registries as DbRegistry[]).map(async (reg) => {
       const pctField = reg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data } = await (supabase.from(reg.table_name) as any)
+        const { data } = await safeFrom(supabase, reg.table_name)
           .select(`tablespace_name, ${pctField}`)
           .eq('report_date', reportDate)
           .gte(pctField, thresholds.warn)

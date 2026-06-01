@@ -11,6 +11,7 @@ import { DatabaseSummary, DbRegistry, TopGrowing } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'
 import { sortDatabases } from '@/lib/utils/sort'
 import { getThresholds } from '@/lib/utils/getThresholds'
+import { safeFrom } from '@/lib/db/safeTable'
 
 interface RecentAlert {
   db_key: string
@@ -70,8 +71,7 @@ async function getOverviewData() {
         const pctField = reg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
         const usedField = reg.schema_type === 'standard' ? 'used_ts_size' : 'gb_used'
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const tb = supabase.from(reg.table_name) as any
+        const tb = safeFrom(supabase, reg.table_name)
         const [{ data: todayData }, { data: prevData }] = await Promise.all([
           tb.select(`tablespace_name, ${pctField}, ${usedField}`).eq('report_date', today),
           yesterday
