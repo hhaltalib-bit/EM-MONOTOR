@@ -5,7 +5,7 @@ import { sendBackupStatusAlert, sendMissingBackupAlert } from '@/lib/email/alert
 import { getOAuth2Client, findHtmlContent } from '@/lib/gmail/gmail-client'
 import { secureCompare } from '@/lib/utils/secureCompare'
 import { parseAndStoreBackup } from '@/lib/services/backupService'
-import { MAX_HTML_BYTES } from '@/lib/constants'
+import { MAX_HTML_BYTES, GMAIL_MAX_RESULTS } from '@/lib/constants'
 
 async function logBackupReport(
   reportDate: string,
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     const { data: listData } = await gmail.users.messages.list({
       userId: 'me',
       q,
-      maxResults: 5,
+      maxResults: GMAIL_MAX_RESULTS,
     })
 
     if (!listData.messages || listData.messages.length === 0) {

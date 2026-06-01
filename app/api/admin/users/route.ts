@@ -3,13 +3,14 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/utils/rateLimit'
 import { requireAuth } from '@/lib/auth/requireAuth'
 import { writeAudit } from '@/lib/utils/auditLog'
+import { USER_LIST_LIMIT } from '@/lib/constants'
 
 export async function GET(_req: NextRequest) {
   const auth = await requireAuth(true)
   if (!auth.ok) return auth.response
 
   const svc = createServiceClient()
-  const { data: authData, error } = await svc.auth.admin.listUsers({ perPage: 200 })
+  const { data: authData, error } = await svc.auth.admin.listUsers({ perPage: USER_LIST_LIMIT })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

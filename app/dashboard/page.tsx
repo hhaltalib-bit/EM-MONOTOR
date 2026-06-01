@@ -12,6 +12,7 @@ import { getSeverity } from '@/lib/utils/severity'
 import { sortDatabases } from '@/lib/utils/sort'
 import { getThresholds } from '@/lib/utils/getThresholds'
 import { safeFrom } from '@/lib/db/safeTable'
+import { GROWTH_IGNORE_THRESHOLD } from '@/lib/constants'
 
 interface RecentAlert {
   db_key: string
@@ -126,7 +127,7 @@ async function getOverviewData() {
             const todayUsed = row[usedField] as number
             const prev = prevMap.get(name) ?? todayUsed
             const growth = Math.max(0, todayUsed - prev)
-            if (growth > 0.1) {
+            if (growth > GROWTH_IGNORE_THRESHOLD) {
               growing.push({
                 db_key: reg.db_key, db_name: reg.db_name,
                 tablespace_name: name, growth_gb: growth,

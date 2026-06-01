@@ -1,4 +1,5 @@
 import { google } from 'googleapis'
+import { GMAIL_MAX_RESULTS } from '@/lib/constants'
 
 export function getOAuth2Client() {
   const oauth2Client = new google.auth.OAuth2(
@@ -26,7 +27,7 @@ export async function fetchTodayReport(forced = false): Promise<{ found: false }
     const { data: listData } = await gmail.users.messages.list({
       userId: 'me',
       q,
-      maxResults: 5,
+      maxResults: GMAIL_MAX_RESULTS,
     })
 
     if (!listData.messages || listData.messages.length === 0) {

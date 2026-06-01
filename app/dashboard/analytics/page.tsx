@@ -6,6 +6,7 @@ import { LineChart } from '@/components/analytics/LineChart'
 import { getSeverity } from '@/lib/utils/severity'
 import { useThresholds } from '@/contexts/ThresholdContext'
 import { DbRegistry } from '@/types'
+import { MS_PER_DAY } from '@/lib/constants'
 
 interface ChartPoint {
   date: string
@@ -101,7 +102,7 @@ export default function AnalyticsPage() {
     const usedField = selectedReg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
     const sizeField = selectedReg.schema_type === 'standard' ? 'used_ts_size' : 'gb_used'
     const toDate = latestDate
-    const fromDate = new Date(new Date(latestDate).getTime() - selectedRange * 86400000).toISOString().split('T')[0]
+    const fromDate = new Date(new Date(latestDate).getTime() - selectedRange * MS_PER_DAY).toISOString().split('T')[0]
 
     const supabase = createClient()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

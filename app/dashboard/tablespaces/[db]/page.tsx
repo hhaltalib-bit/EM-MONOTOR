@@ -9,6 +9,7 @@ import { SkeletonLoader } from '@/components/shared/SkeletonLoader'
 import { StandardTablespace, DwhTablespace, DbRegistry } from '@/types'
 import { getSeverity } from '@/lib/utils/severity'
 import { useThresholds } from '@/contexts/ThresholdContext'
+import { MS_PER_DAY, SPARKLINE_DAYS } from '@/lib/constants'
 
 type AnyTablespace = StandardTablespace | DwhTablespace
 
@@ -65,7 +66,7 @@ export default function DbDetailPage() {
       const { data: todayData } = await tb.select('*').eq('report_date', date)
       if (!todayData) { setLoading(false); return }
 
-      const sevenDayAgo = new Date(new Date(date).getTime() - 6 * 86400000).toISOString().split('T')[0]
+      const sevenDayAgo = new Date(new Date(date).getTime() - (SPARKLINE_DAYS - 1) * MS_PER_DAY).toISOString().split('T')[0]
       const { data: sparkData } = await tb
         .select(`tablespace_name, ${pctField}, report_date`)
         .gte('report_date', sevenDayAgo)
@@ -175,7 +176,7 @@ export default function DbDetailPage() {
 
   const navDate = (delta: number) => {
     if (!reportDate || !registry) return
-    const next = new Date(new Date(reportDate).getTime() + delta * 86400000).toISOString().split('T')[0]
+    const next = new Date(new Date(reportDate).getTime() + delta * MS_PER_DAY).toISOString().split('T')[0]
     const today = new Date().toISOString().split('T')[0]
     if (next <= today) {
       setReportDate(next)
