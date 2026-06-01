@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+// Pure parser — no database writes. Persistence is handled by backupService.ts.
 
 export interface ParsedBackupRow {
   db_key: string
@@ -35,17 +35,13 @@ function parseOracleTimestamp(s: string): string | null {
   const trimmed = s?.trim()
   if (!trimmed) return null
 
-  // Normalize: collapse internal newlines/whitespace into a single space.
-  // SQL*Plus splits "2025-05-12\n 06:56:15" across two lines in the HTML cell.
   const normalized = trimmed.replace(/[\r\n]+\s*/g, ' ').trim()
 
-  // ISO format: "2026-05-15 02:00:17" or "2026-05-15T02:00:17"
   if (/^\d{4}-\d{2}-\d{2}/.test(normalized)) {
     const d = new Date(normalized.replace(' ', 'T'))
     return isNaN(d.getTime()) ? null : d.toISOString()
   }
 
-  // Oracle: 15-MAY-26 02.00.17 AM  or  15-MAY-2026 02.00.17 AM
   const m = normalized.match(/(\d{1,2})-([A-Z]{3})-(\d{2,4})\s+(\d{1,2})\.(\d{2})\.(\d{2})\s*(AM|PM)?/i)
   if (m) {
     const mon = MONTH_MAP[m[2].toUpperCase()]
@@ -105,49 +101,36 @@ function classify(
   return 'healthy'
 }
 
-// Convert output size — handles bytes, MB, or GB depending on scale
 function normalizeOutputGb(raw: string): number | null {
   const n = parseFloat(raw)
   if (isNaN(n)) return null
-  // Values > 1 billion are likely bytes
   if (n > 1_000_000_000) return Math.round((n / 1_073_741_824) * 100) / 100
-  // Values > 1 million are likely MB (from v$backup_piece OUTPUT_BYTES_DISPLAY sometimes uses MB)
   if (n > 100_000) return Math.round((n / 1024) * 100) / 100
-  // Treat as GB already
   return Math.round(n * 100) / 100
 }
 
-export async function parseBackupReport(
+/**
+ * Pure parsing function — reads HTML, returns structured rows.
+ * Does NOT interact with the database.
+ * Pass a regMap to resolve db_key → db_name; if null, db_name defaults to db_key.
+ */
+export function parseBackupReport(
   htmlContent: string,
   reportDate: string,
-): Promise<BackupParseResult> {
-  const supabase = createServiceClient()
-
-  // Pre-scan for "Database Name" labels (same pattern as tablespace html-parser)
+  regMap: Map<string, string> | null = null,
+): BackupParseResult {
   const dbKeyPositions: Array<{ pos: number; key: string }> = []
   const labelPattern = /Database Name[\s\S]*?<td[^>]*>\s*([A-Za-z0-9_]+)\s*[:\-]/gi
   let lm: RegExpExecArray | null
   while ((lm = labelPattern.exec(htmlContent)) !== null) {
     dbKeyPositions.push({ pos: lm.index, key: lm[1].toLowerCase() })
   }
-  // Also check for "DB Name" style headers common in RMAN output
   const dbNamePattern = /DB Name\s*[:\s]+([A-Za-z0-9_]+)/gi
   while ((lm = dbNamePattern.exec(htmlContent)) !== null) {
     if (!dbKeyPositions.find(d => Math.abs(d.pos - lm!.index) < 50)) {
       dbKeyPositions.push({ pos: lm.index, key: lm[1].toLowerCase() })
     }
   }
-
-  // Fetch backup registry once for name lookups
-  const { data: registry } = await supabase
-    .from('backup_registry')
-    .select('db_key, db_name')
-  const regMap = new Map<string, string>(
-    (registry || []).map((r: { db_key: string; db_name: string }) => [
-      r.db_key.toLowerCase(),
-      r.db_name,
-    ])
-  )
 
   const rows: ParsedBackupRow[] = []
   const seenKeys = new Set<string>()
@@ -161,8 +144,6 @@ export async function parseBackupReport(
     if (tableRows.length < 2) continue
 
     const header = tableRows[0].map(h => h.toUpperCase().trim())
-
-    // Only process RMAN backup tables that have INPUT_TYPE column
     const inputTypeIdx = header.findIndex(h => h === 'INPUT_TYPE')
     if (inputTypeIdx === -1) continue
 
@@ -173,16 +154,13 @@ export async function parseBackupReport(
     const outputGbIdx     = header.findIndex(h => h.startsWith('OUTPUT_GB') || h === 'OUTPUT_BYTES')
     const outputDeviceIdx = header.findIndex(h => h.startsWith('OUTPUT_DEVICE'))
 
-    // Closest preceding db label
     const precedingLabel = dbKeyPositions.filter(d => d.pos < tablePos).pop()
     if (!precedingLabel) continue
 
     const dbKey = precedingLabel.key
-    // One row per db_key per report
     if (seenKeys.has(dbKey)) continue
     seenKeys.add(dbKey)
 
-    // Only the FIRST data row (most recent backup for this DB)
     const dataRow = tableRows[1]
     if (!dataRow?.length) continue
 
@@ -196,7 +174,7 @@ export async function parseBackupReport(
 
     const ageDays = calcAgeDays(startTimeIso)
     const classification = classify(statusRaw, ageDays)
-    const dbName = regMap.get(dbKey) || dbKey
+    const dbName = regMap?.get(dbKey) || dbKey
 
     rows.push({
       db_key:         dbKey,
@@ -226,25 +204,6 @@ export async function parseBackupReport(
       reason: 'no_backup_tables_found',
     }
   }
-
-  // Bulk UPSERT — single round trip instead of one per row
-  await supabase.from('backup_status').upsert(
-    rows.map(row => ({
-      report_date:    reportDate,
-      db_key:         row.db_key,
-      db_name:        row.db_name,
-      backup_type:    row.backup_type,
-      start_time:     row.start_time,
-      end_time:       row.end_time,
-      status:         row.status,
-      time_taken:     row.time_taken,
-      output_gb:      row.output_gb,
-      output_device:  row.output_device,
-      age_days:       row.age_days,
-      classification: row.classification,
-    })),
-    { onConflict: 'report_date,db_key', ignoreDuplicates: true }
-  )
 
   const healthyCount = rows.filter(r => r.classification === 'healthy').length
   const delayedCount = rows.filter(r => r.classification === 'delayed').length

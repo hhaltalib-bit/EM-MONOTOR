@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import { parseBackupReport } from '@/lib/parser/backup-parser'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendBackupStatusAlert, sendMissingBackupAlert } from '@/lib/email/alerts'
 import { getOAuth2Client, findHtmlContent } from '@/lib/gmail/gmail-client'
 import { secureCompare } from '@/lib/utils/secureCompare'
+import { parseAndStoreBackup } from '@/lib/services/backupService'
 
 async function logBackupReport(
   reportDate: string,
@@ -28,20 +28,13 @@ async function logBackupReport(
       ignored_count:   ignoredCount,
       notes,
     })
-  } catch { /* non-critical */ }
+  } catch (err) {
+    console.error('[backup-log] failed to write backup_report_log:', err)
+  }
 }
 
-interface ParseAndStoreResult {
-  reportDate: string
-  databasesCount: number
-  healthyCount: number
-  delayedCount: number
-  failedCount: number
-  ignoredCount: number
-}
-
-async function parseAndStoreBackup(html: string, reportDate: string, notes: string | null = null): Promise<ParseAndStoreResult> {
-  const result = await parseBackupReport(html, reportDate)
+async function runParseAndStore(html: string, reportDate: string) {
+  const result = await parseAndStoreBackup(html, reportDate)
 
   if (!result.success) {
     throw new Error(result.reason || 'Parse failed')
@@ -54,7 +47,7 @@ async function parseAndStoreBackup(html: string, reportDate: string, notes: stri
     result.delayedCount,
     result.failedCount,
     result.ignoredCount,
-    notes,
+    null,
   )
 
   if (result.failedCount > 0 || result.delayedCount > 0) {
@@ -68,14 +61,7 @@ async function parseAndStoreBackup(html: string, reportDate: string, notes: stri
     } catch (e) { console.error('Backup alert email failed:', e) }
   }
 
-  return {
-    reportDate,
-    databasesCount: result.databasesCount,
-    healthyCount:   result.healthyCount,
-    delayedCount:   result.delayedCount,
-    failedCount:    result.failedCount,
-    ignoredCount:   result.ignoredCount,
-  }
+  return result
 }
 
 // POST — called by Google Apps Script with { html: '...' }
@@ -100,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     const reportDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' })
 
-    const result = await parseAndStoreBackup(html, reportDate, null)
+    const result = await runParseAndStore(html, reportDate)
 
     return NextResponse.json({
       success:            true,
@@ -162,7 +148,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, reason: 'no_html_content' })
     }
 
-    const result = await parseAndStoreBackup(htmlContent, reportDate, null)
+    const result = await runParseAndStore(htmlContent, reportDate)
 
     return NextResponse.json({
       success:        true,
