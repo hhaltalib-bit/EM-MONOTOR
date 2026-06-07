@@ -23,7 +23,7 @@ interface HistoryEntry {
   status: string
 }
 
-async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; history: HistoryEntry[] }> {
+async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; history: HistoryEntry[]; noTablespaceData: boolean }> {
   const supabase = createServiceClient()
   const thresholds = await getThresholds()
 
@@ -36,8 +36,25 @@ async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; 
     (supabase.from('backup_report_log') as any).select('report_date, status, databases_count').order('report_date', { ascending: false }).limit(30),
   ])
 
-  if (!reportDate) return { alerts: [], reportDate: '', history: [] }
-  if (!registries?.length) return { alerts: [], reportDate, history: [] }
+  // Build history independently — backup history must show even when tablespace data is missing
+  const tsHistory: HistoryEntry[] = (tsLogs ?? []).map((r: Record<string, unknown>) => ({
+    report_date: r.report_date as string,
+    type: 'TS_INGEST' as const,
+    count: (r.databases_processed as number | null) ?? null,
+    status: r.status as string,
+  }))
+  const backupHistory: HistoryEntry[] = (backupLogs ?? []).map((r: Record<string, unknown>) => ({
+    report_date: r.report_date as string,
+    type: 'BACKUP' as const,
+    count: (r.databases_count as number | null) ?? null,
+    status: r.status as string,
+  }))
+  const history = [...tsHistory, ...backupHistory]
+    .sort((a, b) => b.report_date.localeCompare(a.report_date))
+    .slice(0, 30)
+
+  if (!reportDate) return { alerts: [], reportDate: '', history, noTablespaceData: true }
+  if (!registries?.length) return { alerts: [], reportDate, history, noTablespaceData: false }
 
   const results = await Promise.all(
     (registries as DbRegistry[]).map(async (reg) => {
@@ -68,29 +85,11 @@ async function getAlerts(): Promise<{ alerts: AlertEntry[]; reportDate: string; 
     return b.pct - a.pct
   })
 
-  const tsHistory: HistoryEntry[] = (tsLogs ?? []).map((r: Record<string, unknown>) => ({
-    report_date: r.report_date as string,
-    type: 'TS_INGEST' as const,
-    count: (r.databases_processed as number | null) ?? null,
-    status: r.status as string,
-  }))
-
-  const backupHistory: HistoryEntry[] = (backupLogs ?? []).map((r: Record<string, unknown>) => ({
-    report_date: r.report_date as string,
-    type: 'BACKUP' as const,
-    count: (r.databases_count as number | null) ?? null,
-    status: r.status as string,
-  }))
-
-  const history = [...tsHistory, ...backupHistory]
-    .sort((a, b) => b.report_date.localeCompare(a.report_date))
-    .slice(0, 30)
-
-  return { alerts, reportDate, history }
+  return { alerts, reportDate, history, noTablespaceData: false }
 }
 
 export default async function NotificationsPage() {
-  const { alerts, reportDate, history } = await getAlerts()
+  const { alerts, reportDate, history, noTablespaceData } = await getAlerts()
 
   const critCount = alerts.filter(a => a.severity === 'critical').length
   const warnCount = alerts.filter(a => a.severity === 'warning').length
@@ -117,7 +116,12 @@ export default async function NotificationsPage() {
         </div>
 
         <div style={{ padding: '8px 0' }}>
-          {alerts.length === 0 && (
+          {noTablespaceData && (
+            <div style={{ padding: '32px 48px', textAlign: 'center', color: 'var(--wa)', fontFamily: 'monospace', fontSize: '12px' }}>
+              No tablespace data for today — tablespace report not yet received.
+            </div>
+          )}
+          {!noTablespaceData && alerts.length === 0 && (
             <div style={{ padding: '48px', textAlign: 'center', color: 'var(--tx3)', fontFamily: 'monospace', fontSize: '12px' }}>
               No notifications yet
             </div>

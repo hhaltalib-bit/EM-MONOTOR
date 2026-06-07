@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { secureCompare } from '@/lib/utils/secureCompare'
 import { processIngest } from '@/lib/services/ingestService'
 import { MAX_HTML_BYTES } from '@/lib/constants'
+import { logger } from '@/lib/utils/logger'
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get('x-cron-secret')
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
       htmlContent = body.html
     }
   } catch (err) {
-    console.error('[ingest] failed to parse request body:', err)
+    logger.error('ingest', 'failed to parse request body', { err: String(err) })
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
@@ -32,6 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   const isTest = request.nextUrl.searchParams.get('test') === '1'
-  const result = await processIngest(htmlContent, isTest)
+  const traceId = randomUUID()
+  const result = await processIngest(htmlContent, isTest, traceId)
   return NextResponse.json(result)
 }

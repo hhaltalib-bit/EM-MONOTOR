@@ -115,6 +115,7 @@ export interface ParseResult {
   reason?: string
   report_date?: string
   report_time?: string
+  expected_date?: string
   databases?: ParsedDatabase[]
   noChange?: boolean
 }

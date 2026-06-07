@@ -1,15 +1,17 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseHtmlReport } from '@/lib/parser/html-parser'
 import { ParsedStandardRow, ParsedDwhRow } from '@/types'
-import { sendRapidGrowthAlert } from '@/lib/email/alerts'
+import { sendRapidGrowthAlert, sendMissingTablespaceAlert } from '@/lib/email/alerts'
 import { safeFrom } from '@/lib/db/safeTable'
 import { getThresholds } from '@/lib/utils/getThresholds'
 import { RAPID_GROWTH_DEFAULT_GB, GROWTH_WINDOW_DAYS, MS_PER_DAY } from '@/lib/constants'
+import { logger } from '@/lib/utils/logger'
 
 export interface IngestResult {
   success: boolean
   report_date?: string
   report_time?: string
+  expected_date?: string
   databases_processed: number
   total_rows_inserted: number
   critical_count: number
@@ -21,10 +23,39 @@ export interface IngestResult {
 export async function processIngest(
   htmlContent: string,
   isTest: boolean,
+  traceId?: string,
 ): Promise<IngestResult> {
   const parsed = parseHtmlReport(htmlContent, isTest)
 
   if (!parsed.valid) {
+    if (parsed.reason === 'date_mismatch') {
+      logger.warn('ingest', 'tablespace report rejected', {
+        traceId,
+        reason: 'date_mismatch',
+        reportDate: parsed.report_date,
+        expectedDate: parsed.expected_date,
+        htmlSize: htmlContent.length,
+      })
+      try {
+        await sendMissingTablespaceAlert(parsed.expected_date ?? '', 'date_mismatch')
+      } catch (e) {
+        logger.error('ingest', 'missing tablespace alert email failed', { traceId, err: String(e) })
+      }
+      await logIngest({
+        status: 'skipped',
+        error_message: `date_mismatch: reportDate=${parsed.report_date}, expected=${parsed.expected_date}`,
+      })
+      return {
+        success: false,
+        reason: 'date_mismatch',
+        report_date: parsed.report_date,
+        expected_date: parsed.expected_date,
+        databases_processed: 0,
+        total_rows_inserted: 0,
+        critical_count: 0,
+        warning_count: 0,
+      }
+    }
     await logIngest({ status: 'skipped', error_message: `Validation failed: ${parsed.reason}` })
     return { success: false, reason: parsed.reason, databases_processed: 0, total_rows_inserted: 0, critical_count: 0, warning_count: 0 }
   }
@@ -152,7 +183,7 @@ export async function processIngest(
         await sendRapidGrowthAlert(parsed.report_date, rapidItems)
       }
     } catch (err) {
-      console.error('[rapid-growth-check] failed:', err)
+      logger.error('rapid-growth-check', 'rapid growth check failed', { err: String(err) })
     }
   }
 
@@ -181,6 +212,6 @@ async function logIngest(data: {
     const supabase = createServiceClient()
     await supabase.from('report_log').insert(data)
   } catch (err) {
-    console.error('[ingest-log] failed to write report_log:', err)
+    logger.error('ingest-log', 'failed to write report_log', { err: String(err) })
   }
 }

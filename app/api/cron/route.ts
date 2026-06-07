@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { fetchTodayReport } from '@/lib/gmail/gmail-client'
-import { sendMissingReportAlert } from '@/lib/email/alerts'
+import { sendMissingTablespaceAlert } from '@/lib/email/alerts'
 import { createServiceClient } from '@/lib/supabase/server'
 import { secureCompare } from '@/lib/utils/secureCompare'
 import { processIngest } from '@/lib/services/ingestService'
+import { logger } from '@/lib/utils/logger'
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -13,18 +15,20 @@ export async function GET(request: NextRequest) {
   }
 
   const isForced = request.nextUrl.searchParams.get('force') === '1'
+  const traceId = randomUUID()
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baghdad' }).format(new Date())
 
   try {
     const result = await fetchTodayReport(isForced)
 
     if (!result.found) {
-      try { await sendMissingReportAlert() } catch (e) { console.error('Missing report email failed:', e) }
+      try { await sendMissingTablespaceAlert(today, 'not_received') } catch (e) { logger.error('cron', 'missing report email failed', { err: String(e) }) }
       await logToDb('error', null, null, 0, 0, 'Report not found in Gmail')
       return NextResponse.json({ success: false, reason: 'report_not_found' })
     }
 
     // SEC-C-04: call processIngest directly instead of HTTP self-call (removes SSRF risk)
-    const ingestResult = await processIngest(result.content, isForced)
+    const ingestResult = await processIngest(result.content, isForced, traceId)
 
     return NextResponse.json({ success: true, gmail_message_id: result.messageId, ingest_result: ingestResult })
   } catch (error) {
@@ -39,6 +43,6 @@ async function logToDb(status: string, reportDate: string | null, reportTime: st
     const supabase = createServiceClient()
     await supabase.from('report_log').insert({ status, report_date: reportDate, report_time: reportTime, databases_processed: dbsProcessed, total_rows_inserted: rowsInserted, error_message: errorMessage })
   } catch (err) {
-    console.error('[cron-log] failed to write report_log:', err)
+    logger.error('cron-log', 'failed to write report_log', { err: String(err) })
   }
 }

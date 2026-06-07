@@ -44,7 +44,7 @@ export function parseHtmlReport(htmlContent: string, skipDateValidation = false)
   // Step 3: Validate date (must be today in GMT+3, matching Apps Script's timezone)
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baghdad' }).format(new Date())
   if (!skipDateValidation && reportDate !== today) {
-    return { valid: false, reason: 'wrong_date' }
+    return { valid: false, reason: 'date_mismatch', report_date: reportDate, expected_date: today }
   }
 
   // Step 4: Pre-scan for "Database Name" table labels with their character positions.

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { google } from 'googleapis'
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendBackupStatusAlert, sendMissingBackupAlert } from '@/lib/email/alerts'
@@ -6,6 +7,12 @@ import { getOAuth2Client, findHtmlContent } from '@/lib/gmail/gmail-client'
 import { secureCompare } from '@/lib/utils/secureCompare'
 import { parseAndStoreBackup } from '@/lib/services/backupService'
 import { MAX_HTML_BYTES, GMAIL_MAX_RESULTS } from '@/lib/constants'
+import { logger } from '@/lib/utils/logger'
+
+function tryExtractBackupDate(html: string): string | null {
+  const m = html.match(/(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}/)
+  return m ? m[1] : null
+}
 
 async function logBackupReport(
   reportDate: string,
@@ -30,7 +37,7 @@ async function logBackupReport(
       notes,
     })
   } catch (err) {
-    console.error('[backup-log] failed to write backup_report_log:', err)
+    logger.error('backup-log', 'failed to write backup_report_log', { err: String(err) })
   }
 }
 
@@ -72,6 +79,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const traceId = randomUUID()
+
   try {
     const body = await request.json()
     const html = body.html
@@ -84,18 +93,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, reason: 'payload_too_large' }, { status: 413 })
     }
 
-    const reportDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' })
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baghdad' }).format(new Date())
+    const isTest = request.nextUrl.searchParams.get('test') === '1'
 
-    const result = await runParseAndStore(html, reportDate)
+    if (!isTest) {
+      const htmlDate = tryExtractBackupDate(html)
+      if (htmlDate !== null && htmlDate !== today) {
+        logger.warn('cron-backup', 'backup report rejected', {
+          traceId,
+          reason: 'date_mismatch',
+          reportDate: htmlDate,
+          expectedDate: today,
+          htmlSize: html.length,
+        })
+        try { await sendMissingBackupAlert(today, 'date_mismatch') } catch (e) {
+          logger.error('cron-backup', 'missing backup alert email failed', { traceId, err: String(e) })
+        }
+        return NextResponse.json({ success: false, reason: 'date_mismatch', report_date: htmlDate, expected_date: today })
+      }
+      if (htmlDate === null) {
+        logger.warn('cron-backup', 'no date found in backup HTML — proceeding without date check', { traceId, htmlSize: html.length })
+      }
+    }
+
+    const result = await runParseAndStore(html, today)
 
     return NextResponse.json({
-      success:            true,
-      reportDate:         result.reportDate,
+      success:             true,
+      reportDate:          result.reportDate,
       databases_processed: result.databasesCount,
-      healthy_count:      result.healthyCount,
-      delayed_count:      result.delayedCount,
-      failed_count:       result.failedCount,
-      ignored_count:      result.ignoredCount,
+      healthy_count:       result.healthyCount,
+      delayed_count:       result.delayedCount,
+      failed_count:        result.failedCount,
+      ignored_count:       result.ignoredCount,
     })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
@@ -131,7 +161,7 @@ export async function GET(request: NextRequest) {
 
     if (!listData.messages || listData.messages.length === 0) {
       await logBackupReport(reportDate, 'missing', 0, 0, 0, 0, 0, 'Backup report not found in Gmail')
-      try { await sendMissingBackupAlert(reportDate) } catch (e) { console.error('Alert email failed:', e) }
+      try { await sendMissingBackupAlert(reportDate, 'not_received') } catch (e) { logger.error('cron-backup', 'missing backup alert email failed', { err: String(e) }) }
       return NextResponse.json({ success: false, reason: 'report_not_found' })
     }
 

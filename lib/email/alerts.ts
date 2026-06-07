@@ -14,23 +14,45 @@ async function getAlertEmail(): Promise<string> {
   return process.env.ALERT_EMAIL_TO ?? ''
 }
 
-export async function sendMissingReportAlert() {
-  const today = new Date().toISOString().split('T')[0]
-  const subject = `⚠️ EM MONITOR: Daily report NOT received — ${today}`
+async function sendWithTimeout<T>(fn: () => Promise<T>, ms = 10_000): Promise<T> {
+  return Promise.race([
+    fn(),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`alert send timed out after ${ms}ms`)), ms)
+    ),
+  ])
+}
+
+const DASH_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://em-monitor.vercel.app'
+
+export async function sendMissingTablespaceAlert(date: string, reason: string) {
+  const to = await getAlertEmail()
+  const subject = `🚨 EM Monitor: Tablespace Report Missing — ${date}`
 
   const html = `
     <div style="font-family:system-ui,sans-serif;background:#080c14;color:#c9d1d9;padding:24px;max-width:600px;">
-      <h1 style="font-size:20px;font-weight:500;color:#d29922;margin:0 0 8px;">Missing Report Alert</h1>
-      <p style="color:#8b949e;margin:0 0 16px;font-size:13px;">${today}</p>
+      <h1 style="font-size:20px;font-weight:500;color:#f85149;margin:0 0 8px;">Tablespace Report Missing</h1>
+      <p style="color:#8b949e;margin:0 0 16px;font-size:13px;">Expected date: ${date}</p>
 
-      <div style="background:#391e05;border:0.5px solid #d29922;border-radius:8px;padding:12px 16px;">
-        <p style="margin:0;font-size:13px;color:#d29922;">
-          The daily TableSpace Report was expected at 01:30 AM (GMT+3) but has not been received as of 02:00 AM.
+      <div style="background:#2a0a0a;border:0.5px solid #f85149;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+        <p style="margin:0 0 6px;font-size:13px;color:#f85149;">
+          Reason: <span style="font-family:monospace;">${reason}</span>
         </p>
-        <p style="margin:8px 0 0;font-size:11px;color:#8b949e;font-family:monospace;">
-          Please check: Oracle scheduler, email forwarding rules, Gmail connectivity
+        <p style="margin:0;font-size:13px;color:#c9d1d9;font-weight:500;">
+          System will NOT process old data.
         </p>
       </div>
+
+      <div style="background:#0e1421;border:0.5px solid #1a2640;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+        <p style="margin:0 0 6px;font-size:11px;color:#8b949e;font-family:monospace;">What to check:</p>
+        <p style="margin:0;font-size:12px;color:#c9d1d9;">
+          Oracle email forwarding · Report scheduler · Gmail connectivity
+        </p>
+      </div>
+
+      <a href="${DASH_URL}/dashboard" style="display:inline-block;background:#1a2640;color:#58a6ff;padding:8px 16px;border-radius:6px;font-size:12px;text-decoration:none;font-family:monospace;">
+        Open Dashboard →
+      </a>
 
       <p style="font-size:11px;color:#3d5068;font-family:monospace;margin-top:20px;">
         EM MONITOR Enterprise · Automated Alert
@@ -38,13 +60,55 @@ export async function sendMissingReportAlert() {
     </div>
   `
 
-  const to = await getAlertEmail()
-  await resend.emails.send({
+  await sendWithTimeout(() => resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
     to,
     subject,
     html,
-  })
+  }))
+}
+
+export async function sendMissingBackupAlert(date: string, reason: string) {
+  const to = await getAlertEmail()
+  const subject = `🚨 EM Monitor: RMAN Backup Report Missing — ${date}`
+
+  const html = `
+    <div style="font-family:system-ui,sans-serif;background:#080c14;color:#c9d1d9;padding:24px;max-width:600px;">
+      <h1 style="font-size:20px;font-weight:500;color:#f85149;margin:0 0 8px;">RMAN Backup Report Missing</h1>
+      <p style="color:#8b949e;margin:0 0 16px;font-size:13px;">Expected date: ${date}</p>
+
+      <div style="background:#2a0a0a;border:0.5px solid #f85149;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+        <p style="margin:0 0 6px;font-size:13px;color:#f85149;">
+          Reason: <span style="font-family:monospace;">${reason}</span>
+        </p>
+        <p style="margin:0;font-size:13px;color:#c9d1d9;font-weight:500;">
+          System will NOT process old data.
+        </p>
+      </div>
+
+      <div style="background:#0e1421;border:0.5px solid #1a2640;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+        <p style="margin:0 0 6px;font-size:11px;color:#8b949e;font-family:monospace;">What to check:</p>
+        <p style="margin:0;font-size:12px;color:#c9d1d9;">
+          Oracle RMAN scheduler · Email forwarding · Gmail connectivity
+        </p>
+      </div>
+
+      <a href="${DASH_URL}/dashboard/backup" style="display:inline-block;background:#1a2640;color:#58a6ff;padding:8px 16px;border-radius:6px;font-size:12px;text-decoration:none;font-family:monospace;">
+        Open Backup Dashboard →
+      </a>
+
+      <p style="font-size:11px;color:#3d5068;font-family:monospace;margin-top:20px;">
+        EM MONITOR Enterprise · Automated Alert
+      </p>
+    </div>
+  `
+
+  await sendWithTimeout(() => resend.emails.send({
+    from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
+    to,
+    subject,
+    html,
+  }))
 }
 
 export async function sendBackupStatusAlert(data: {
@@ -84,12 +148,12 @@ export async function sendBackupStatusAlert(data: {
   `
 
   const to = await getAlertEmail()
-  await resend.emails.send({
+  await sendWithTimeout(() => resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
     to,
     subject,
     html,
-  })
+  }))
 }
 
 export async function sendRapidGrowthAlert(
@@ -101,7 +165,7 @@ export async function sendRapidGrowthAlert(
     .join('')
 
   const to = await getAlertEmail()
-  await resend.emails.send({
+  await sendWithTimeout(() => resend.emails.send({
     from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
     to,
     subject: `⚠️ EM MONITOR: Rapid Tablespace Growth Detected — ${date} (${items.length} tablespace${items.length > 1 ? 's' : ''})`,
@@ -129,31 +193,5 @@ export async function sendRapidGrowthAlert(
         </p>
       </div>
     `,
-  })
-}
-
-export async function sendMissingBackupAlert(reportDate: string) {
-  const to = await getAlertEmail()
-  await resend.emails.send({
-    from: process.env.ALERT_EMAIL_FROM || 'EM MONITOR <alerts@yourdomain.com>',
-    to,
-    subject: `⚠️ EM MONITOR: RMAN Backup Report NOT received — ${reportDate}`,
-    html: `
-      <div style="font-family:system-ui,sans-serif;background:#080c14;color:#c9d1d9;padding:24px;max-width:600px;">
-        <h1 style="font-size:20px;font-weight:500;color:#d29922;margin:0 0 8px;">Missing RMAN Backup Report</h1>
-        <p style="color:#8b949e;margin:0 0 16px;font-size:13px;">${reportDate}</p>
-        <div style="background:#391e05;border:0.5px solid #d29922;border-radius:8px;padding:12px 16px;">
-          <p style="margin:0;font-size:13px;color:#d29922;">
-            The daily RMAN Backup Report was expected at 07:00–08:00 AM (GMT+3) but was not found in Gmail.
-          </p>
-          <p style="margin:8px 0 0;font-size:11px;color:#8b949e;font-family:monospace;">
-            Please check: RMAN scheduler · email forwarding rules · Gmail connectivity
-          </p>
-        </div>
-        <p style="font-size:11px;color:#3d5068;font-family:monospace;margin-top:20px;">
-          EM MONITOR Enterprise · Automated Alert
-        </p>
-      </div>
-    `,
-  })
+  }))
 }
