@@ -16,6 +16,8 @@ export interface BackupStatusRow {
   output_device: string | null
   age_days: number
   classification: 'healthy' | 'delayed' | 'failed' | 'ignored'
+  failed_types: string | null
+  succeeded_types: string | null
   created_at: string
 }
 
@@ -90,7 +92,7 @@ export async function GET(req: NextRequest) {
 
     const [{ data: statuses }, { data: logRow }, { data: prevRow }, { data: nextRow }, { data: historyRows }] = await Promise.all([
       supabase.from('backup_status')
-        .select('id, report_date, db_key, db_name, backup_type, start_time, end_time, status, time_taken, output_gb, output_device, age_days, classification')
+        .select('id, report_date, db_key, db_name, backup_type, start_time, end_time, status, time_taken, output_gb, output_device, age_days, classification, failed_types, succeeded_types')
         .eq('report_date', reportDate),
       supabase
         .from('backup_report_log')

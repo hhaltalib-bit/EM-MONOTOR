@@ -12,6 +12,8 @@ export interface ParsedBackupRow {
   output_device: string | null
   age_days: number
   classification: 'healthy' | 'delayed' | 'failed' | 'ignored'
+  failed_types: string | null
+  succeeded_types: string | null
 }
 
 export interface BackupParseResult {
@@ -24,6 +26,18 @@ export interface BackupParseResult {
   failedCount: number
   ignoredCount: number
   reason?: string
+}
+
+interface RawBackupRow {
+  db_key: string
+  db_name: string
+  backup_type: string | null
+  start_time: string | null
+  end_time: string | null
+  status: string | null
+  time_taken: string | null
+  output_gb: number | null
+  output_device: string | null
 }
 
 const MONTH_MAP: Record<string, number> = {
@@ -132,8 +146,8 @@ export function parseBackupReport(
     }
   }
 
-  const rows: ParsedBackupRow[] = []
-  const seenKeys = new Set<string>()
+  // Phase A: collect ALL rows into a Map grouped by db_key (no seenKeys skip)
+  const allRows = new Map<string, RawBackupRow[]>()
 
   const tablePattern = /<table[\s\S]*?<\/table>/gi
   let tm: RegExpExecArray | null
@@ -157,41 +171,38 @@ export function parseBackupReport(
     const precedingLabel = dbKeyPositions.filter(d => d.pos < tablePos).pop()
     if (!precedingLabel) continue
 
-    const dbKey = precedingLabel.key
-    if (seenKeys.has(dbKey)) continue
-    seenKeys.add(dbKey)
-
-    const dataRow = tableRows[1]
-    if (!dataRow?.length) continue
-
-    const backupType   = inputTypeIdx >= 0 ? (dataRow[inputTypeIdx]?.trim() || null) : null
-    const statusRaw    = statusIdx >= 0 ? (dataRow[statusIdx]?.trim().toUpperCase() || null) : null
-    const startTimeIso = parseOracleTimestamp(startTimeIdx >= 0 ? (dataRow[startTimeIdx] || '') : '')
-    const endTimeIso   = parseOracleTimestamp(endTimeIdx >= 0 ? (dataRow[endTimeIdx] || '') : '')
-    const timeTaken    = timeTakenIdx >= 0 ? (dataRow[timeTakenIdx]?.trim() || null) : null
-    const outputGb     = outputGbIdx >= 0 ? normalizeOutputGb(dataRow[outputGbIdx] || '') : null
-    const outputDevice = outputDeviceIdx >= 0 ? (dataRow[outputDeviceIdx]?.trim() || null) : null
-
-    const ageDays = calcAgeDays(startTimeIso)
-    const classification = classify(statusRaw, ageDays)
+    const dbKey  = precedingLabel.key
     const dbName = regMap?.get(dbKey) || dbKey
 
-    rows.push({
-      db_key:         dbKey,
-      db_name:        dbName,
-      backup_type:    backupType,
-      start_time:     startTimeIso,
-      end_time:       endTimeIso,
-      status:         statusRaw,
-      time_taken:     timeTaken,
-      output_gb:      outputGb,
-      output_device:  outputDevice,
-      age_days:       ageDays,
-      classification,
-    })
+    // Collect ALL data rows for this table (skip header at index 0)
+    for (let ri = 1; ri < tableRows.length; ri++) {
+      const dataRow = tableRows[ri]
+      if (!dataRow?.length) continue
+
+      const backupType   = inputTypeIdx >= 0 ? (dataRow[inputTypeIdx]?.trim() || null) : null
+      const statusRaw    = statusIdx >= 0 ? (dataRow[statusIdx]?.trim().toUpperCase() || null) : null
+      const startTimeIso = parseOracleTimestamp(startTimeIdx >= 0 ? (dataRow[startTimeIdx] || '') : '')
+      const endTimeIso   = parseOracleTimestamp(endTimeIdx >= 0 ? (dataRow[endTimeIdx] || '') : '')
+      const timeTaken    = timeTakenIdx >= 0 ? (dataRow[timeTakenIdx]?.trim() || null) : null
+      const outputGb     = outputGbIdx >= 0 ? normalizeOutputGb(dataRow[outputGbIdx] || '') : null
+      const outputDevice = outputDeviceIdx >= 0 ? (dataRow[outputDeviceIdx]?.trim() || null) : null
+
+      if (!allRows.has(dbKey)) allRows.set(dbKey, [])
+      allRows.get(dbKey)!.push({
+        db_key:        dbKey,
+        db_name:       dbName,
+        backup_type:   backupType,
+        start_time:    startTimeIso,
+        end_time:      endTimeIso,
+        status:        statusRaw,
+        time_taken:    timeTaken,
+        output_gb:     outputGb,
+        output_device: outputDevice,
+      })
+    }
   }
 
-  if (rows.length === 0) {
+  if (allRows.size === 0) {
     return {
       success: false,
       reportDate,
@@ -202,6 +213,84 @@ export function parseBackupReport(
       failedCount: 0,
       ignoredCount: 0,
       reason: 'no_backup_tables_found',
+    }
+  }
+
+  // Phase B–D: for each db_key, classify using all rows for that db
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Baghdad',
+  }).format(new Date())
+
+  const rows: ParsedBackupRow[] = []
+
+  for (const [dbKey, rawRows] of allRows) {
+    const dbName = rawRows[0].db_name
+
+    // Phase B: split into today vs not-today rows
+    const todayRows = rawRows.filter(r => {
+      const rowDate = r.start_time ? r.start_time.split('T')[0] : null
+      return rowDate === today
+    })
+
+    if (todayRows.length > 0) {
+      // Phase C: analyze all today rows together
+      const failedRows    = todayRows.filter(r => r.status === 'FAILED')
+      const completedRows = todayRows.filter(r => r.status === 'COMPLETED' || r.status === 'RUNNING')
+
+      const failedTypes = failedRows.length > 0
+        ? [...new Set(failedRows.map(r => r.backup_type).filter((t): t is string => t !== null))].join(', ') || null
+        : null
+      const succeededTypes = completedRows.length > 0
+        ? [...new Set(completedRows.map(r => r.backup_type).filter((t): t is string => t !== null))].join(', ') || null
+        : null
+
+      // Priority: failed > healthy (age_days = 0, so classify() never returns delayed/ignored here)
+      const classification: 'healthy' | 'failed' = failedRows.length > 0 ? 'failed' : 'healthy'
+      const repRow = failedRows.length > 0
+        ? failedRows[0]
+        : (completedRows[0] ?? todayRows[0])
+
+      rows.push({
+        db_key:         dbKey,
+        db_name:        dbName,
+        backup_type:    repRow.backup_type,
+        start_time:     repRow.start_time,
+        end_time:       repRow.end_time,
+        status:         repRow.status,
+        time_taken:     repRow.time_taken,
+        output_gb:      repRow.output_gb,
+        output_device:  repRow.output_device,
+        age_days:       0,
+        classification,
+        failed_types:    failedTypes,
+        succeeded_types: succeededTypes,
+      })
+    } else {
+      // Phase C (no today rows): use old age-based logic on the most recent row
+      const sorted = [...rawRows].sort((a, b) => {
+        const aT = a.start_time ? new Date(a.start_time).getTime() : 0
+        const bT = b.start_time ? new Date(b.start_time).getTime() : 0
+        return bT - aT
+      })
+      const mostRecent   = sorted[0]
+      const ageDays      = calcAgeDays(mostRecent.start_time)
+      const classification = classify(mostRecent.status, ageDays)
+
+      rows.push({
+        db_key:         dbKey,
+        db_name:        dbName,
+        backup_type:    mostRecent.backup_type,
+        start_time:     mostRecent.start_time,
+        end_time:       mostRecent.end_time,
+        status:         mostRecent.status,
+        time_taken:     mostRecent.time_taken,
+        output_gb:      mostRecent.output_gb,
+        output_device:  mostRecent.output_device,
+        age_days:       ageDays,
+        classification,
+        failed_types:    null,
+        succeeded_types: null,
+      })
     }
   }
 

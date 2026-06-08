@@ -375,8 +375,21 @@ export default function BackupPage() {
                       <div style={{ fontSize: '13px', fontWeight: 500, color: TX, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {row.db_name}
                       </div>
-                      {row.backup_type && (
-                        <div style={{ fontSize: '10px', color: TX2, marginTop: '2px' }}>{row.backup_type}</div>
+                      {row.failed_types ? (
+                        <>
+                          <div style={{ fontSize: '10px', color: R, marginTop: '2px', fontFamily: 'monospace' }}>
+                            Failed: {row.failed_types}
+                          </div>
+                          {row.succeeded_types && (
+                            <div style={{ fontSize: '10px', color: G, marginTop: '1px', fontFamily: 'monospace' }}>
+                              OK: {row.succeeded_types}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        row.backup_type && (
+                          <div style={{ fontSize: '10px', color: TX2, marginTop: '2px' }}>{row.backup_type}</div>
+                        )
                       )}
                     </div>
                     <Badge text="FAILED" color={R} bg={RB} border={R} />
