@@ -16,6 +16,8 @@ export interface IngestResult {
   total_rows_inserted: number
   critical_count: number
   warning_count: number
+  critical_dbs: Array<{ name: string; pct: number }>
+  warning_dbs:  Array<{ name: string; pct: number }>
   reason?: string
   errors?: string[]
 }
@@ -48,16 +50,18 @@ export async function processIngest(
       return {
         success: false,
         reason: 'date_mismatch',
-        report_date: parsed.report_date,
-        expected_date: parsed.expected_date,
+        report_date:        parsed.report_date,
+        expected_date:      parsed.expected_date,
         databases_processed: 0,
         total_rows_inserted: 0,
         critical_count: 0,
-        warning_count: 0,
+        warning_count:  0,
+        critical_dbs:   [],
+        warning_dbs:    [],
       }
     }
     await logIngest({ status: 'skipped', error_message: `Validation failed: ${parsed.reason}` })
-    return { success: false, reason: parsed.reason, databases_processed: 0, total_rows_inserted: 0, critical_count: 0, warning_count: 0 }
+    return { success: false, reason: parsed.reason, databases_processed: 0, total_rows_inserted: 0, critical_count: 0, warning_count: 0, critical_dbs: [], warning_dbs: [] }
   }
 
   const supabase = createServiceClient()
@@ -77,6 +81,8 @@ export async function processIngest(
   let dbsProcessed = 0
   let criticalCount = 0
   let warningCount = 0
+  const criticalDbs: Array<{ name: string; pct: number }> = []
+  const warningDbs:  Array<{ name: string; pct: number }> = []
   const errors: string[] = []
 
   for (const db of parsed.databases!) {
@@ -104,10 +110,13 @@ export async function processIngest(
         totalInserted += rows.length
 
         // Count in-memory — no second DB query needed
-        for (const row of rows) {
-          const pct = row.max_ts_pct_used
-          if (pct >= thresholds.crit) criticalCount++
-          else if (pct >= thresholds.warn) warningCount++
+        const worstPctStd = Math.max(...rows.map(r => r.max_ts_pct_used))
+        if (worstPctStd >= thresholds.crit) {
+          criticalDbs.push({ name: reg.db_name, pct: Math.round(worstPctStd) })
+          criticalCount += rows.filter(r => r.max_ts_pct_used >= thresholds.crit).length
+        } else if (worstPctStd >= thresholds.warn) {
+          warningDbs.push({ name: reg.db_name, pct: Math.round(worstPctStd) })
+          warningCount += rows.filter(r => r.max_ts_pct_used >= thresholds.warn).length
         }
       } else {
         const rows = (db.tablespaces as ParsedDwhRow[]).map(ts => ({
@@ -123,10 +132,13 @@ export async function processIngest(
         totalInserted += rows.length
 
         // Count in-memory — no second DB query needed
-        for (const row of rows) {
-          const pct = row.percent_used
-          if (pct >= thresholds.crit) criticalCount++
-          else if (pct >= thresholds.warn) warningCount++
+        const worstPctDwh = Math.max(...rows.map(r => r.percent_used))
+        if (worstPctDwh >= thresholds.crit) {
+          criticalDbs.push({ name: reg.db_name, pct: Math.round(worstPctDwh) })
+          criticalCount += rows.filter(r => r.percent_used >= thresholds.crit).length
+        } else if (worstPctDwh >= thresholds.warn) {
+          warningDbs.push({ name: reg.db_name, pct: Math.round(worstPctDwh) })
+          warningCount += rows.filter(r => r.percent_used >= thresholds.warn).length
         }
       }
       dbsProcessed++
@@ -187,14 +199,19 @@ export async function processIngest(
     }
   }
 
+  criticalDbs.sort((a, b) => b.pct - a.pct)
+  warningDbs.sort((a, b) => b.pct - a.pct)
+
   return {
     success: true,
-    report_date: parsed.report_date,
-    report_time: parsed.report_time,
+    report_date:        parsed.report_date,
+    report_time:        parsed.report_time,
     databases_processed: dbsProcessed,
     total_rows_inserted: totalInserted,
-    critical_count: criticalCount,
-    warning_count: warningCount,
+    critical_count:     criticalCount,
+    warning_count:      warningCount,
+    critical_dbs:       criticalDbs,
+    warning_dbs:        warningDbs,
     errors: errors.length > 0 ? errors : undefined,
   }
 }
