@@ -37,7 +37,7 @@ export function parseHtmlReport(htmlContent: string, skipDateValidation = false)
   const reportHour = parseInt(reportTime.split(':')[0], 10)
 
   // Step 2: Validate time (must be between 01:00 and 05:59)
-  if (reportHour < 1 || reportHour > 5) {
+  if (!skipDateValidation && (reportHour < 1 || reportHour > 5)) {
     return { valid: false, reason: 'wrong_time' }
   }
 
