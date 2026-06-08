@@ -126,6 +126,8 @@ export async function POST(request: NextRequest) {
       delayed_count:       result.delayedCount,
       failed_count:        result.failedCount,
       ignored_count:       result.ignoredCount,
+      failed_dbs:          result.failed_dbs  ?? [],
+      delayed_dbs:         result.delayed_dbs ?? [],
     })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
@@ -188,6 +190,8 @@ export async function GET(request: NextRequest) {
       delayedCount:   result.delayedCount,
       failedCount:    result.failedCount,
       ignoredCount:   result.ignoredCount,
+      failed_dbs:     result.failed_dbs  ?? [],
+      delayed_dbs:    result.delayed_dbs ?? [],
     })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)

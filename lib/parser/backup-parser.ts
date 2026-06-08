@@ -25,6 +25,8 @@ export interface BackupParseResult {
   delayedCount: number
   failedCount: number
   ignoredCount: number
+  failed_dbs?:  Array<{ name: string; age: number; lastRun: string }>
+  delayed_dbs?: Array<{ name: string; age: number; lastRun: string }>
   reason?: string
 }
 

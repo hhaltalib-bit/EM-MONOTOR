@@ -31,6 +31,26 @@ export async function parseAndStoreBackup(
   // Persist: bulk upsert — single round trip
   await storeBackupRows(supabase, result.rows, reportDate)
 
+  result.failed_dbs = result.rows
+    .filter(r => r.classification === 'failed')
+    .map(r => ({
+      name:    r.db_name,
+      age:     r.age_days,
+      lastRun: r.start_time
+        ? r.start_time.replace('T', ' ').substring(0, 16)
+        : 'N/A',
+    }))
+
+  result.delayed_dbs = result.rows
+    .filter(r => r.classification === 'delayed')
+    .map(r => ({
+      name:    r.db_name,
+      age:     r.age_days,
+      lastRun: r.start_time
+        ? r.start_time.replace('T', ' ').substring(0, 16)
+        : 'N/A',
+    }))
+
   return result
 }
 
