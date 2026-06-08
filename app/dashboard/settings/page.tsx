@@ -10,6 +10,8 @@ interface UserEntry {
   created_at: string
   role: string
   display_name: string
+  failed_attempts: number
+  locked_until: string | null
 }
 
 interface AddFormState {
@@ -78,6 +80,7 @@ export default function SettingsPage() {
   const [usersLoading, setUsersLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+  const [unlockLoading, setUnlockLoading] = useState<string | null>(null)
   const [addForm, setAddForm] = useState<AddFormState>({ open: false, email: '', password: '', role: 'DBA', loading: false, error: '' })
   const [pwdForm, setPwdForm] = useState<PwdFormState | null>(null)
   const [userMsg, setUserMsg] = useState<{ text: string; ok: boolean } | null>(null)
@@ -152,6 +155,25 @@ export default function SettingsPage() {
       showMsg((err as Error).message, false)
     } finally {
       setDeleteLoading(null)
+    }
+  }
+
+  async function handleUnlockUser(userId: string) {
+    setUnlockLoading(userId)
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unlock' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to unlock account')
+      showMsg('Account unlocked', true)
+      loadUsers()
+    } catch (err) {
+      showMsg((err as Error).message, false)
+    } finally {
+      setUnlockLoading(null)
     }
   }
 
@@ -335,6 +357,7 @@ export default function SettingsPage() {
           users.map((member, i) => {
             const isSelf = member.id === currentUserId
             const isChangingPwd = pwdForm?.userId === member.id
+            const isLocked = !!member.locked_until && new Date(member.locked_until) > new Date()
 
             return (
               <div key={member.id}>
@@ -347,11 +370,31 @@ export default function SettingsPage() {
                       {member.display_name} {isSelf && <span style={{ fontSize: '10px', color: 'var(--Gv)', fontFamily: 'monospace' }}>(you)</span>}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--tx3)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</div>
+                    {isLocked && member.locked_until && (
+                      <div style={{ fontSize: '10px', color: 'var(--cr)', fontFamily: 'monospace', marginTop: '2px' }}>
+                        🔒 Locked until {new Date(member.locked_until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                    {!isLocked && member.failed_attempts > 0 && (
+                      <div style={{ fontSize: '10px', color: '#f59e0b', fontFamily: 'monospace', marginTop: '2px' }}>
+                        {member.failed_attempts}/5 attempts
+                      </div>
+                    )}
                   </div>
                   <span className="tg" style={{ background: member.role === 'Admin' ? 'var(--Gd)' : 'var(--bg4)', color: member.role === 'Admin' ? 'var(--Gv)' : 'var(--tx2)', flexShrink: 0 }}>
                     {member.role}
                   </span>
                   <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+                    {isLocked && !isSelf && (
+                      <button
+                        onClick={() => handleUnlockUser(member.id)}
+                        disabled={unlockLoading === member.id}
+                        style={{ ...btnStyle, color: 'var(--cr)', borderColor: 'var(--cr)', opacity: unlockLoading === member.id ? 0.5 : 1 }}
+                        title="Unlock account"
+                      >
+                        <i className="ti ti-lock-open" style={{ fontSize: '12px' }} />
+                      </button>
+                    )}
                     <button
                       onClick={() => setPwdForm(isChangingPwd ? null : { userId: member.id, password: '', loading: false, error: '' })}
                       style={{ ...btnStyle, color: isChangingPwd ? 'var(--Gv)' : 'var(--tx2)' }}

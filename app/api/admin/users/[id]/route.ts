@@ -37,7 +37,21 @@ export async function PATCH(
 
   const svc = createServiceClient()
   const { id } = await params
-  const { password } = await req.json() as { password: string }
+  const ip = req.headers.get('x-forwarded-for') ?? undefined
+  const body = await req.json() as { password?: string; action?: string }
+
+  // Unlock action
+  if (body.action === 'unlock') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (svc.from('user_profiles') as any)
+      .update({ failed_attempts: 0, locked_until: null })
+      .eq('user_id', id)
+    await writeAudit({ actorId: auth.user.id, actorEmail: auth.user.email, action: 'user.unlock', target: id, ip })
+    return NextResponse.json({ success: true })
+  }
+
+  // Password change
+  const { password } = body
   if (!password || password.length < 12) return NextResponse.json({ error: 'Password must be at least 12 characters' }, { status: 400 })
   const { error } = await svc.auth.admin.updateUserById(id, { password })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -49,7 +63,6 @@ export async function PATCH(
     console.error('[admin-patch] session invalidation failed:', err)
   }
 
-  const ip = req.headers.get('x-forwarded-for') ?? undefined
   await writeAudit({ actorId: auth.user.id, actorEmail: auth.user.email, action: 'user.password_change', target: id, ip })
 
   return NextResponse.json({ success: true })

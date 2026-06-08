@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Routes that skip session auth (use CRON_SECRET or are public monitoring endpoints)
+// Routes that skip session auth (cron/ingest use CRON_SECRET; auth/login is public)
 const CRON_PATHS = [
   '/api/cron',
   '/api/cron-backup',
@@ -11,11 +11,20 @@ const CRON_PATHS = [
   '/api/cron-healthcheck',
 ]
 
+const PUBLIC_API_PATHS = [
+  '/api/auth/login',
+]
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
 
   // Skip session validation for secret-authenticated cron/ingest routes
   if (CRON_PATHS.some(p => path.startsWith(p))) {
+    return NextResponse.next()
+  }
+
+  // Skip session validation for public API routes (e.g. login with lockout logic)
+  if (PUBLIC_API_PATHS.some(p => path.startsWith(p))) {
     return NextResponse.next()
   }
 

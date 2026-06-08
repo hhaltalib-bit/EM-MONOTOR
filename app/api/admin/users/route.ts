@@ -14,16 +14,21 @@ export async function GET(_req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profiles } = await (svc.from('user_profiles') as any).select('user_id, role, display_name')
+  const { data: profiles } = await (svc.from('user_profiles') as any).select('user_id, role, display_name, failed_attempts, locked_until')
   const profileMap = new Map(((profiles ?? []) as Record<string, unknown>[]).map(p => [p.user_id as string, p]))
 
-  const users = authData.users.map(u => ({
-    id: u.id,
-    email: u.email ?? '',
-    created_at: u.created_at,
-    role: (profileMap.get(u.id) as Record<string, unknown> | undefined)?.role ?? 'DBA',
-    display_name: (profileMap.get(u.id) as Record<string, unknown> | undefined)?.display_name ?? u.email?.split('@')[0] ?? '',
-  }))
+  const users = authData.users.map(u => {
+    const p = profileMap.get(u.id) as Record<string, unknown> | undefined
+    return {
+      id: u.id,
+      email: u.email ?? '',
+      created_at: u.created_at,
+      role: p?.role ?? 'DBA',
+      display_name: p?.display_name ?? u.email?.split('@')[0] ?? '',
+      failed_attempts: (p?.failed_attempts as number) ?? 0,
+      locked_until: (p?.locked_until as string | null) ?? null,
+    }
+  })
 
   return NextResponse.json({ users, currentUserId: auth.user.id })
 }

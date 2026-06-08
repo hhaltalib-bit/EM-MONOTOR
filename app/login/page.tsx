@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import OrbitRings from '@/components/OrbitRings'
 
 export default function LoginPage() {
@@ -11,6 +10,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
+  const [errorIsWarning, setErrorIsWarning] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [isDark, setIsDark]     = useState(false)
   const router = useRouter()
@@ -18,6 +18,7 @@ export default function LoginPage() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setErrorIsWarning(false)
 
     if (!username.trim() || !password.trim()) {
       setError('Enter both username and password to continue.')
@@ -25,20 +26,37 @@ export default function LoginPage() {
     }
 
     setLoading(true)
-    const supabase = createClient()
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: username,
-      password,
-    })
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: username, password }),
+      })
 
-    if (error) {
-      setError(error.message || 'Invalid credentials. Please try again.')
+      if (res.ok) {
+        router.push('/dashboard')
+        return
+      }
+
+      const data = await res.json() as { error: string; minutesLeft?: number; attemptsLeft?: number }
+
+      if (res.status === 423) {
+        setError(`Account locked. Try again in ${data.minutesLeft ?? 15} minutes.`)
+      } else if (res.status === 401) {
+        const left = data.attemptsLeft ?? 0
+        if (left === 1) {
+          setErrorIsWarning(true)
+          setError('Warning: 1 attempt left before lockout.')
+        } else {
+          setError(`Invalid credentials. ${left} attempt${left !== 1 ? 's' : ''} remaining.`)
+        }
+      } else {
+        setError('An error occurred. Please try again.')
+      }
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
       setLoading(false)
-      return
-    }
-
-    if (data.session) {
-      router.push('/dashboard')
     }
   }
 
@@ -358,14 +376,14 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Error */}
+          {/* Error / Warning */}
           {error && (
             <div style={{
-              color:'#f85149',
+              color: errorIsWarning ? '#f59e0b' : '#f85149',
               fontSize:'12px',
               padding:'9px 14px',
-              background:'rgba(248,81,73,0.08)',
-              border:'0.5px solid rgba(248,81,73,0.4)',
+              background: errorIsWarning ? 'rgba(245,158,11,0.08)' : 'rgba(248,81,73,0.08)',
+              border: errorIsWarning ? '0.5px solid rgba(245,158,11,0.4)' : '0.5px solid rgba(248,81,73,0.4)',
               borderRadius:'8px',
               marginBottom:'14px',
               animation:'slideUp 0.2s',
