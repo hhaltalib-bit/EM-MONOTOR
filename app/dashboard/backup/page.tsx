@@ -287,11 +287,6 @@ export default function BackupPage() {
 
   const counts = [healthy.length, delayed.length, failed.length, ignored.length]
 
-  // Healthy: show first 6, rest in footer
-  const LIMIT = 6
-  const healthyShow = healthy.slice(0, LIMIT)
-  const healthyRest = healthy.length - LIMIT
-
   const total = failed.length + delayed.length + healthy.length + ignored.length
 
   return (
@@ -444,10 +439,10 @@ export default function BackupPage() {
               <SectionHeader icon="ti-shield-check" label="HEALTHY — BACKED UP TODAY" count={healthy.length} color={G} bg={GB} border={G} />
               <div style={{ border: `0.5px solid ${G}`, borderTop: 'none', borderRadius: '0 0 6px 6px', background: BG2, overflow: 'hidden' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                  {healthyShow.map((row, i) => (
+                  {healthy.map((row, i) => (
                     <div key={row.id} style={{
                       display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-                      borderBottom: i < healthyShow.length - (healthyShow.length % 2 === 0 ? 2 : 1) ? `0.5px solid ${BG3}` : 'none',
+                      borderBottom: i < healthy.length - (healthy.length % 2 === 0 ? 2 : 1) ? `0.5px solid ${BG3}` : 'none',
                       borderRight: i % 2 === 0 ? `0.5px solid ${BG3}` : 'none',
                       animation: `popIn 0.3s ${i * 0.025}s ease-out both`,
                     }}>
@@ -466,11 +461,6 @@ export default function BackupPage() {
                     </div>
                   ))}
                 </div>
-                {healthyRest > 0 && (
-                  <div style={{ padding: '8px 12px', borderTop: `0.5px solid ${BG3}`, fontSize: '10px', color: TX3, fontFamily: 'monospace', textAlign: 'center' }}>
-                    + {healthyRest} more healthy databases
-                  </div>
-                )}
               </div>
             </section>
           )}
