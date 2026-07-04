@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardTitle, Badge } from '@/components/analytics/ui'
+import { fmtPct, fmtNum } from '@/lib/analytics/format'
 
 interface ForecastRow {
   ts_name: string
@@ -61,8 +62,8 @@ export function ForecastTab() {
               <tr key={`${r.db_name}:${r.ts_name}`}>
                 <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', fontFamily: 'monospace' }}>{r.ts_name}</td>
                 <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)' }}>{r.db_name}</td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{r.pct.toFixed(1)}%</td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>+{r.rate.toFixed(2)}%</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{fmtPct(r.pct)}</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>+{fmtNum(r.rate)}%</td>
                 <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>
                   <Badge text={`${r.days} days`} color={r.days < 30 ? 'red' : r.days < 90 ? 'amber' : 'green'} />
                 </td>

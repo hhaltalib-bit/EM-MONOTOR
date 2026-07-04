@@ -4,16 +4,22 @@ import '@/components/analytics/registerChart'
 import { Line } from 'react-chartjs-2'
 import type { TooltipItem } from 'chart.js'
 import { themeColors, CHART_COLORS } from '@/lib/analytics/chartColors'
+import { fmtPct, fmtSize } from '@/lib/analytics/format'
 
 interface Props {
   dates: string[]
   pct: number[]
-  sizeGb: number[]
+  // The used-space value for the SAME row/index as pct[i] — pct is computed
+  // as used/max at the source, so used is what should move in lockstep with
+  // it. (Previously this chart was paired with the allocated `size` field,
+  // which can stay flat across days while pct keeps climbing — that looked
+  // like a pct/size inconsistency but was really just a mislabeled pairing.)
+  usedGb: number[]
   dark: boolean
   color?: string
 }
 
-export function UsagePctChart({ dates, pct, sizeGb, dark, color = CHART_COLORS.green }: Props) {
+export function UsagePctChart({ dates, pct, usedGb, dark, color = CHART_COLORS.green }: Props) {
   const tc = themeColors(dark)
   const labels = dates.map(d => d.slice(5))
 
@@ -46,7 +52,7 @@ export function UsagePctChart({ dates, pct, sizeGb, dark, color = CHART_COLORS.g
             bodyFont: { size: 12 },
             callbacks: {
               title: (items) => dates[items[0].dataIndex] ?? '',
-              label: (c: TooltipItem<'line'>) => `Used: ${c.parsed.y}% · ${sizeGb[c.dataIndex]?.toLocaleString() ?? '?'} GB`,
+              label: (c: TooltipItem<'line'>) => `Used: ${fmtPct(c.parsed.y)} · ${fmtSize(usedGb[c.dataIndex])}`,
             },
           },
         },

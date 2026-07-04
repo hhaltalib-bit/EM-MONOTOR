@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { Card, Badge, severityBadgeColor, btnStyle } from '@/components/analytics/ui'
 import { Sparkline } from '@/components/analytics/charts/Sparkline'
 import { DbRegistry } from '@/types'
+import { fmtPct, fmtGrowth } from '@/lib/analytics/format'
+import { growthTextColor } from '@/lib/analytics/chartColors'
 
 const STORAGE_KEY = 'em_watchlist'
 
@@ -129,11 +131,11 @@ export function WatchlistTab({ onOpenDeepDive }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '14px', fontWeight: 600, fontFamily: 'monospace', color: 'var(--txv)' }}>{d.tsName}</span>
                 <span style={{ fontSize: '11px', color: 'var(--tx3)' }}>{d.dbName}</span>
-                <Badge text={`${d.latestPct?.toFixed(1)}% · ${(d.severity ?? '').toUpperCase()}`} color={severityBadgeColor(d.severity ?? 'healthy')} />
+                <Badge text={`${fmtPct(d.latestPct)} · ${(d.severity ?? '').toUpperCase()}`} color={severityBadgeColor(d.severity ?? 'healthy')} />
               </div>
               <div style={{ fontSize: '12px', color: 'var(--tx2)' }}>
-                Today: <b style={{ color: (d.todayGrowthGb ?? 0) > 0 ? 'var(--cr)' : 'var(--hl)' }}>
-                  {(d.todayGrowthGb ?? 0) >= 0 ? '+' : ''}{(d.todayGrowthGb ?? 0).toFixed(1)} GB
+                Today: <b style={{ color: growthTextColor(d.todayGrowthGb ?? 0) }}>
+                  {fmtGrowth(d.todayGrowthGb ?? 0)}
                 </b>
               </div>
             </div>

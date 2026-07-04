@@ -5,6 +5,7 @@ import { Card, btnStyle } from '@/components/analytics/ui'
 import { MultiLineChart, SeriesDef } from '@/components/analytics/charts/MultiLineChart'
 import { CHART_COLORS } from '@/lib/analytics/chartColors'
 import { DbRegistry } from '@/types'
+import { fmtPct, fmtNum } from '@/lib/analytics/format'
 
 const STORAGE_KEY = 'em_compare_items'
 const MAX_ITEMS = 3
@@ -145,7 +146,7 @@ export function CompareTab({ dark }: { dark: boolean }) {
           <Card style={{ marginBottom: '14px' }}>
             <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: 'var(--txv)' }}>Usage % — side by side</div>
             <div style={{ position: 'relative', height: '230px' }} key={`cmp-${dark}`}>
-              <MultiLineChart labels={labels} series={chartSeries} dark={dark} tooltipLabel={(l, v) => `${l}: ${v}%`} yTick={(v) => `${v}%`} />
+              <MultiLineChart labels={labels} series={chartSeries} dark={dark} tooltipLabel={(l, v) => `${l}: ${fmtPct(v)}`} yTick={(v) => fmtPct(v)} />
             </div>
           </Card>
           <Card>
@@ -167,9 +168,9 @@ export function CompareTab({ dark }: { dark: boolean }) {
                       <span style={{ color: PILL_COLORS[i % PILL_COLORS.length] }}>●</span>{' '}
                       <span style={{ fontFamily: 'monospace' }}>{r.ts_name}</span>
                     </td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{r.currentPct.toFixed(1)}%</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{r.growth30d >= 0 ? '+' : ''}{r.growth30d.toFixed(1)}%</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{r.ratePerDay >= 0 ? '+' : ''}{r.ratePerDay.toFixed(2)}%</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{fmtPct(r.currentPct)}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{r.growth30d >= 0 ? '+' : ''}{fmtNum(r.growth30d)}%</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{r.ratePerDay >= 0 ? '+' : ''}{fmtNum(r.ratePerDay)}%</td>
                     <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right', color: trendColor(r.trend) }}>{trendLabel(r.trend)}</td>
                   </tr>
                 ))}

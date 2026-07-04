@@ -3,6 +3,7 @@ export const CHART_COLORS = {
   red: '#dc2626',
   amber: '#d97706',
   blue: '#3b82f6',
+  gray: '#6b7280',
 } as const
 
 export function themeColors(dark: boolean) {
@@ -13,8 +14,20 @@ export function themeColors(dark: boolean) {
   }
 }
 
-export function growthBarColor(v: number): string {
-  if (v >= 3) return CHART_COLORS.red
-  if (v >= 1.5) return CHART_COLORS.amber
-  return CHART_COLORS.green
+/**
+ * Capacity-monitoring growth color — intentionally the opposite of financial
+ * coloring: growth toward full is the risk, so positive growth is RED and
+ * negative (space freed) is GREEN. Hex version for Chart.js canvas fills.
+ */
+export function growthColor(v: number): string {
+  if (v > 0) return CHART_COLORS.red
+  if (v < 0) return CHART_COLORS.green
+  return CHART_COLORS.gray
+}
+
+/** Same rule as growthColor, but as a CSS variable for regular DOM/JSX text. */
+export function growthTextColor(v: number): string {
+  if (v > 0) return 'var(--cr)'
+  if (v < 0) return 'var(--hl)'
+  return 'var(--tx2)'
 }

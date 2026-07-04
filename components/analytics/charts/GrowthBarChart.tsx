@@ -3,7 +3,8 @@
 import '@/components/analytics/registerChart'
 import { Bar } from 'react-chartjs-2'
 import type { TooltipItem } from 'chart.js'
-import { themeColors, growthBarColor } from '@/lib/analytics/chartColors'
+import { themeColors, growthColor } from '@/lib/analytics/chartColors'
+import { fmtGrowth } from '@/lib/analytics/format'
 
 interface Props {
   dates: string[]
@@ -19,7 +20,10 @@ export function GrowthBarChart({ dates, grw, dark }: Props) {
     <Bar
       data={{
         labels,
-        datasets: [{ data: grw, backgroundColor: grw.map(growthBarColor), borderRadius: 2 }],
+        // Capacity-monitoring rule: growth (filling up) is red, shrink (space
+        // freed) is green, no change is gray. Bar heights keep the raw GB
+        // values for accurate proportions — only labels are formatted.
+        datasets: [{ data: grw, backgroundColor: grw.map(growthColor), borderRadius: 2 }],
       }}
       options={{
         responsive: true,
@@ -33,13 +37,13 @@ export function GrowthBarChart({ dates, grw, dark }: Props) {
             cornerRadius: 8,
             callbacks: {
               title: (items) => dates[items[0].dataIndex] ?? '',
-              label: (c: TooltipItem<'bar'>) => `Growth: ${(c.parsed.y as number) >= 0 ? '+' : ''}${c.parsed.y} GB`,
+              label: (c: TooltipItem<'bar'>) => `Growth: ${fmtGrowth(c.parsed.y as number)}`,
             },
           },
         },
         scales: {
           x: { grid: { display: false }, ticks: { color: tc.tick, maxTicksLimit: 7, font: { size: 10 } } },
-          y: { grid: { color: tc.grid }, ticks: { color: tc.tick, font: { size: 10 }, callback: (v) => `${v} GB` } },
+          y: { grid: { color: tc.grid }, ticks: { color: tc.tick, font: { size: 10 }, callback: (v) => fmtGrowth(v as number) } },
         },
       }}
     />

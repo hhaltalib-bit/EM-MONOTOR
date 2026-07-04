@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardTitle, Insight, MetricCard, MetricsGrid } from '@/components/analytics/ui'
-import { fmtSize } from '@/lib/utils/format'
+import { fmtSize, fmtGrowth, fmtPct } from '@/lib/analytics/format'
+import { growthTextColor } from '@/lib/analytics/chartColors'
 
 interface Mover {
   ts_name: string
@@ -55,12 +56,12 @@ export function OverviewTab() {
         <MetricCard
           label="Fleet total size"
           value={fmtSize(data.fleetTotalGb)}
-          note={data.fleetGrowthMonth != null ? `${data.fleetGrowthMonth >= 0 ? '+' : ''}${fmtSize(Math.abs(data.fleetGrowthMonth))} this month` : undefined}
-          noteColor="var(--hl)"
+          note={data.fleetGrowthMonth != null ? `${fmtGrowth(data.fleetGrowthMonth)} this month` : undefined}
+          noteColor={data.fleetGrowthMonth != null ? growthTextColor(data.fleetGrowthMonth) : undefined}
         />
         <MetricCard label={`Critical ≥ threshold`} value={String(data.criticalCount)} valueColor="var(--cr)" note="tablespaces" />
         <MetricCard label={`Warning ≥ threshold`} value={String(data.warningCount)} valueColor="var(--wa)" note="tablespaces" />
-        <MetricCard label="Avg daily growth" value={fmtSize(data.avgDailyGrowthGb)} note="across fleet" />
+        <MetricCard label="Avg daily growth" value={fmtGrowth(data.avgDailyGrowthGb)} note="across fleet" />
       </MetricsGrid>
 
       <Card>
@@ -81,10 +82,10 @@ export function OverviewTab() {
               <tr key={`${m.db_name}:${m.ts_name}`}>
                 <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', fontFamily: 'monospace' }}>{m.ts_name}</td>
                 <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)' }}>{m.db_name}</td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right', color: m.growth_1d_gb >= 1.5 ? 'var(--cr)' : 'var(--hl)', fontWeight: 650 }}>
-                  {m.growth_1d_gb >= 0 ? '+' : ''}{m.growth_1d_gb.toFixed(1)} GB
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right', color: growthTextColor(m.growth_1d_gb), fontWeight: 650 }}>
+                  {fmtGrowth(m.growth_1d_gb)}
                 </td>
-                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right', color: pctColor(m.pct) }}>{m.pct.toFixed(1)}%</td>
+                <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right', color: pctColor(m.pct) }}>{fmtPct(m.pct)}</td>
               </tr>
             ))}
             {data.topMovers.length === 0 && (

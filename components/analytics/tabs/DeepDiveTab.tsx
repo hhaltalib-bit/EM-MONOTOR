@@ -5,6 +5,8 @@ import { Card, CardTitle, MetricCard, MetricsGrid, selectStyle, btnPrimaryStyle 
 import { UsagePctChart } from '@/components/analytics/charts/UsagePctChart'
 import { GrowthBarChart } from '@/components/analytics/charts/GrowthBarChart'
 import { DbRegistry } from '@/types'
+import { fmtSize, fmtGrowth, fmtPct, fmtNum } from '@/lib/analytics/format'
+import { growthTextColor } from '@/lib/analytics/chartColors'
 
 interface DeepDiveMetrics {
   currentPct: number
@@ -104,7 +106,7 @@ export function DeepDiveTab({ dark, pending, onConsumed }: Props) {
     if (!data) return
     const rows = ['date,size_gb,growth_gb,used_pct']
     data.dates.forEach((d, i) => {
-      rows.push(`${d},${data.size[i]},${data.grw[i]},${data.pct[i]}`)
+      rows.push(`${d},${fmtNum(data.size[i])},${fmtNum(data.grw[i])},${fmtNum(data.pct[i])}`)
     })
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -155,17 +157,17 @@ export function DeepDiveTab({ dark, pending, onConsumed }: Props) {
           <MetricsGrid>
             <MetricCard
               label="Current usage"
-              value={`${data.metrics!.currentPct.toFixed(1)}%`}
+              value={fmtPct(data.metrics!.currentPct)}
               valueColor={statusColor(data.metrics!.statusText)}
               note={data.metrics!.statusText}
             />
-            <MetricCard label="Current size" value={data.metrics!.currentSize.toLocaleString()} note="GB allocated" />
-            <MetricCard label="Used / Free" value={data.metrics!.used.toLocaleString()} note={`${data.metrics!.free.toLocaleString()} GB free`} />
+            <MetricCard label="Current size" value={fmtSize(data.metrics!.currentSize)} note="allocated" />
+            <MetricCard label="Used / Free" value={fmtSize(data.metrics!.used)} note={`${fmtSize(data.metrics!.free)} free`} />
             <MetricCard
               label={`${period}d growth`}
-              value={`${data.metrics!.periodGrowthGb >= 0 ? '+' : ''}${data.metrics!.periodGrowthGb.toFixed(1)}`}
-              valueColor="var(--hl)"
-              note={`GB · autoext ${data.metrics!.aut}`}
+              value={fmtGrowth(data.metrics!.periodGrowthGb)}
+              valueColor={growthTextColor(data.metrics!.periodGrowthGb)}
+              note={`autoext ${data.metrics!.aut}`}
             />
           </MetricsGrid>
 
@@ -173,7 +175,7 @@ export function DeepDiveTab({ dark, pending, onConsumed }: Props) {
             <Card>
               <CardTitle>Usage % over time</CardTitle>
               <div style={{ position: 'relative', height: '200px' }} key={`pct-${dark}`}>
-                <UsagePctChart dates={data.dates} pct={data.pct} sizeGb={data.size} dark={dark} />
+                <UsagePctChart dates={data.dates} pct={data.pct} usedGb={data.used} dark={dark} />
               </div>
             </Card>
             <Card>
@@ -190,7 +192,7 @@ export function DeepDiveTab({ dark, pending, onConsumed }: Props) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr>
-                    {['Date', 'Size (GB)', 'Growth (GB)', 'Used %'].map((h, i) => (
+                    {['Date', 'Size', 'Growth', 'Used %'].map((h, i) => (
                       <th key={h} style={{
                         textAlign: i > 0 ? 'right' : 'left', padding: '9px 12px', fontSize: '10px', fontWeight: 600,
                         color: 'var(--tx3)', letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--bdv)',
@@ -202,15 +204,15 @@ export function DeepDiveTab({ dark, pending, onConsumed }: Props) {
                 <tbody>
                   {[...data.dates.map((d, i) => i)].reverse().map(i => {
                     const g = data.grw[i]
-                    const gc = g >= 3 ? 'var(--cr)' : g >= 1.5 ? 'var(--wa)' : 'var(--txv)'
+                    const gc = growthTextColor(g)
                     return (
                       <tr key={data.dates[i]}>
                         <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)' }}>{data.dates[i]}</td>
-                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{data.size[i].toLocaleString()}</td>
-                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right', color: gc, fontWeight: g >= 1.5 ? 650 : 400 }}>
-                          {g > 0 ? '+' : ''}{g}
+                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{fmtSize(data.size[i])}</td>
+                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right', color: gc, fontWeight: g !== 0 ? 650 : 400 }}>
+                          {fmtGrowth(g)}
                         </td>
-                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{data.pct[i]}%</td>
+                        <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--bdv)', textAlign: 'right' }}>{fmtPct(data.pct[i])}</td>
                       </tr>
                     )
                   })}
