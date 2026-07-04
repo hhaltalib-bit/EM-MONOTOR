@@ -1,326 +1,43 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { LineChart } from '@/components/analytics/LineChart'
-import { getSeverity } from '@/lib/utils/severity'
-import { useThresholds } from '@/contexts/ThresholdContext'
-import { DbRegistry } from '@/types'
-import { MS_PER_DAY } from '@/lib/constants'
-
-interface ChartPoint {
-  date: string
-  value: number
-  gbValue?: number
-}
-
-const RANGES = [
-  { label: 'Last 7 days',  days: 7 },
-  { label: 'Last 30 days', days: 30 },
-  { label: 'Last 90 days', days: 90 },
-]
-
-const selectStyle: React.CSSProperties = {
-  background: 'var(--bg2)',
-  border: '0.5px solid var(--bdv)',
-  borderRadius: '6px',
-  padding: '6px 10px',
-  color: 'var(--txv)',
-  fontSize: '12px',
-  fontFamily: 'monospace',
-  cursor: 'pointer',
-  outline: 'none',
-}
+import { useCallback, useEffect, useState } from 'react'
+import { useTheme } from '@/components/shared/ThemeProvider'
+import { TabBar, TabKey } from '@/components/analytics/TabBar'
+import { OverviewTab } from '@/components/analytics/tabs/OverviewTab'
+import { DeepDiveTab } from '@/components/analytics/tabs/DeepDiveTab'
+import { CompareTab } from '@/components/analytics/tabs/CompareTab'
+import { ForecastTab } from '@/components/analytics/tabs/ForecastTab'
+import { CapacityTab } from '@/components/analytics/tabs/CapacityTab'
+import { WatchlistTab } from '@/components/analytics/tabs/WatchlistTab'
+import { AnomaliesTab } from '@/components/analytics/tabs/AnomaliesTab'
 
 export default function AnalyticsPage() {
   useEffect(() => { document.title = 'EM Monitor — Analytics' }, [])
 
-  const { warnThreshold, critThreshold } = useThresholds()
-  const [databases, setDatabases] = useState<DbRegistry[]>([])
-  const [tablespaces, setTablespaces] = useState<string[]>([])
-  const [chartData, setChartData] = useState<ChartPoint[]>([])
-  const [selectedDb, setSelectedDb] = useState('')
-  const [selectedTs, setSelectedTs] = useState('')
-  const [selectedRange, setSelectedRange] = useState(30)
-  const [selectedReg, setSelectedReg] = useState<DbRegistry | null>(null)
-  const [latestDate, setLatestDate] = useState('')
-  const [loadingTs, setLoadingTs] = useState(false)
-  const [loadingChart, setLoadingChart] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const { theme } = useTheme()
+  const dark = theme === 'dark'
 
-  // Load all databases via API on mount (bypasses RLS)
-  useEffect(() => {
-    fetch('/api/db-list')
-      .then(r => r.json())
-      .then(({ databases: dbs }: { databases: DbRegistry[] }) => {
-        if (dbs?.length) {
-          setDatabases(dbs)
-          setSelectedDb(dbs[0].db_key)
-        }
-      })
-      .catch(() => {})
+  const [activeTab, setActiveTab] = useState<TabKey>('overview')
+  const [pendingDeepDive, setPendingDeepDive] = useState<{ db: string; ts: string } | null>(null)
+
+  const openInDeepDive = useCallback((db: string, ts: string) => {
+    setPendingDeepDive({ db, ts })
+    setActiveTab('deepdive')
   }, [])
 
-  // When db changes: get registry + latest date, then tablespace names
-  useEffect(() => {
-    if (!selectedDb) return
-    setLoadingTs(true)
-    setTablespaces([])
-    setSelectedTs('')
-    setChartData([])
-    setLatestDate('')
-    setSearchQuery('')
-
-    fetch(`/api/db-info?db_key=${encodeURIComponent(selectedDb)}`)
-      .then(r => r.json())
-      .then(({ registry: reg, latestDate: ld }: { registry: DbRegistry; latestDate: string | null }) => {
-        if (!reg || !ld) { setLoadingTs(false); return }
-        setSelectedReg(reg)
-        setLatestDate(ld)
-
-        const supabase = createClient()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(supabase.from(reg.table_name) as any)
-          .select('tablespace_name')
-          .eq('report_date', ld)
-          .order('tablespace_name')
-          .then(({ data }: { data: { tablespace_name: string }[] | null }) => {
-            const names = (data ?? []).map(r => r.tablespace_name)
-            setTablespaces(names)
-            if (names.length > 0) setSelectedTs(names[0])
-            setLoadingTs(false)
-          })
-      })
-      .catch(() => setLoadingTs(false))
-  }, [selectedDb])
-
-  // Fetch chart data when ts, range, or reg changes
-  const fetchChart = useCallback(() => {
-    if (!selectedTs || !selectedReg || !latestDate) return
-    setLoadingChart(true)
-
-    const usedField = selectedReg.schema_type === 'standard' ? 'max_ts_pct_used' : 'percent_used'
-    const sizeField = selectedReg.schema_type === 'standard' ? 'used_ts_size' : 'gb_used'
-    const toDate = latestDate
-    const fromDate = new Date(new Date(latestDate).getTime() - selectedRange * MS_PER_DAY).toISOString().split('T')[0]
-
-    const supabase = createClient()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(supabase.from(selectedReg.table_name) as any)
-      .select(`report_date, ${usedField}, ${sizeField}`)
-      .eq('tablespace_name', selectedTs)
-      .gte('report_date', fromDate)
-      .lte('report_date', toDate)
-      .order('report_date', { ascending: true })
-      .then(({ data }: { data: Record<string, unknown>[] | null }) => {
-        setChartData((data ?? []).map(r => ({
-          date: r.report_date as string,
-          value: r[usedField] as number,
-          gbValue: r[sizeField] as number,
-        })))
-        setLoadingChart(false)
-      })
-      .catch(() => setLoadingChart(false))
-  }, [selectedTs, selectedRange, selectedReg, latestDate])
-
-  useEffect(() => { fetchChart() }, [fetchChart])
-
-  const filteredTablespaces = tablespaces.filter(ts =>
-    ts.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const currentValue = chartData.length > 0 ? chartData[chartData.length - 1].value : 0
-  const currentSeverity = getSeverity(currentValue, warnThreshold, critThreshold)
-  const sevColor =
-    currentSeverity === 'critical' ? 'var(--cr)' :
-    currentSeverity === 'warning'  ? 'var(--wa)' : 'var(--hl)'
-  const last7 = chartData.slice(-7)
-
-  const growthData = chartData.length > 1
-    ? chartData.slice(1).map((d, i) => ({
-        date: d.date,
-        value: parseFloat(Math.max(0, (d.gbValue ?? 0) - (chartData[i].gbValue ?? 0)).toFixed(2)),
-      }))
-    : []
-  const growthMax = growthData.length > 0 ? Math.max(...growthData.map(d => d.value), 0.1) : 1
-
   return (
-    <div style={{ padding: '12px 16px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: '12px' }}>
+    <div style={{ padding: '16px 20px' }} className="page-content">
+      <TabBar active={activeTab} onChange={setActiveTab} />
 
-        {/* Chart panel */}
-        <div style={{ background: 'var(--bg2)', border: '0.5px solid var(--bdv)', borderRadius: '8px', padding: '14px', animation: 'popIn 0.3s ease-out both' }}>
-          {/* Selectors */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <select style={selectStyle} value={selectedDb} onChange={e => setSelectedDb(e.target.value)}>
-              {databases.length === 0 && <option value="">Loading…</option>}
-              {databases.map(db => (
-                <option key={db.db_key} value={db.db_key}>{db.db_name}</option>
-              ))}
-            </select>
-
-            {/* Search input — filters tablespace dropdown in real-time */}
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <i className="ti ti-search" style={{ position: 'absolute', left: '8px', fontSize: '12px', color: 'var(--tx3)', pointerEvents: 'none' }} />
-              <input
-                type="text"
-                placeholder="Search tablespace..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                disabled={!selectedDb}
-                style={{
-                  width: '180px',
-                  background: 'var(--bg2)',
-                  border: '0.5px solid var(--bdv)',
-                  borderRadius: '6px',
-                  padding: '6px 10px 6px 26px',
-                  color: 'var(--txv)',
-                  fontSize: '12px',
-                  fontFamily: 'monospace',
-                  outline: 'none',
-                  opacity: !selectedDb ? 0.5 : 1,
-                  cursor: !selectedDb ? 'not-allowed' : 'text',
-                }}
-                onFocus={e => { e.currentTarget.style.borderColor = 'var(--Gv)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'var(--bdv)' }}
-              />
-            </div>
-
-            <select
-              style={{ ...selectStyle, opacity: loadingTs || tablespaces.length === 0 ? 0.5 : 1 }}
-              value={selectedTs}
-              onChange={e => setSelectedTs(e.target.value)}
-              disabled={loadingTs || tablespaces.length === 0}
-            >
-              {loadingTs && <option value="">Loading tablespaces…</option>}
-              {!loadingTs && tablespaces.length === 0 && <option value="">No data available</option>}
-              {filteredTablespaces.map(ts => (
-                <option key={ts} value={ts}>{ts}</option>
-              ))}
-              {!loadingTs && tablespaces.length > 0 && filteredTablespaces.length === 0 && (
-                <option value="" disabled>No match</option>
-              )}
-            </select>
-
-            <select style={selectStyle} value={selectedRange} onChange={e => setSelectedRange(Number(e.target.value))}>
-              {RANGES.map(r => (
-                <option key={r.days} value={r.days}>{r.label}</option>
-              ))}
-            </select>
-
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '9px', color: 'var(--tx3)', fontFamily: 'monospace', textTransform: 'uppercase' }}>Current</span>
-              <span style={{ fontSize: '24px', fontWeight: 500, color: sevColor, fontFamily: 'monospace' }}>
-                {currentValue.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-
-          {/* Chart title */}
-          <div style={{ marginBottom: '10px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--txv)', fontFamily: 'monospace' }}>
-              {selectedTs || '—'}
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--tx3)', fontFamily: 'monospace' }}>
-              {databases.find(d => d.db_key === selectedDb)?.db_name} · % Used over time
-            </div>
-          </div>
-
-          {/* Chart area */}
-          {loadingChart ? (
-            <div className="sk" style={{ height: '185px', borderRadius: '6px' }} />
-          ) : chartData.length === 0 ? (
-            <div style={{ height: '185px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--tx3)', fontFamily: 'monospace', fontSize: '12px' }}>
-              {selectedTs ? 'No data for selected range' : 'Select a database and tablespace'}
-            </div>
-          ) : (
-            <LineChart data={chartData} severity={currentSeverity} maxValue={100} />
-          )}
-
-          {/* Last 7 days mini row */}
-          {last7.length > 0 && (
-            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '0.5px solid var(--bdv)', overflowX: 'auto' }}>
-              {last7.map(d => {
-                const sev = getSeverity(d.value, warnThreshold, critThreshold)
-                return (
-                  <div key={d.date} style={{ textAlign: 'center', minWidth: '46px' }}>
-                    <div style={{ fontSize: '9px', color: 'var(--tx3)', fontFamily: 'monospace' }}>{d.date.slice(5)}</div>
-                    <div style={{
-                      fontSize: '11px', fontWeight: 500, fontFamily: 'monospace',
-                      color: sev === 'critical' ? 'var(--cr)' : sev === 'warning' ? 'var(--wa)' : 'var(--hl)',
-                    }}>
-                      {d.value.toFixed(1)}%
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Daily GB growth chart */}
-          {growthData.length >= 2 && (
-            <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '0.5px solid var(--bdv)' }}>
-              <div style={{ marginBottom: '10px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--txv)', fontFamily: 'monospace' }}>
-                  Daily Growth (GB)
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--tx3)', fontFamily: 'monospace' }}>
-                  {selectedTs} · day-over-day used size delta
-                </div>
-              </div>
-              {loadingChart ? (
-                <div className="sk" style={{ height: '185px', borderRadius: '6px' }} />
-              ) : (
-                <LineChart data={growthData} severity="healthy" maxValue={growthMax} />
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Info panel */}
-        <div style={{ background: 'var(--bg2)', border: '0.5px solid var(--bdv)', borderRadius: '8px', padding: '14px', animation: 'slideUp 0.4s 0.1s both' }}>
-          <div style={{ fontSize: '9px', color: 'var(--tx2)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '12px', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <i className="ti ti-info-circle" style={{ fontSize: '13px', color: 'var(--Gv)' }} />
-            Chart Info
-          </div>
-
-          {selectedTs && latestDate ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <div style={{ fontSize: '9px', color: 'var(--tx3)', fontFamily: 'monospace', textTransform: 'uppercase', marginBottom: '3px' }}>Database</div>
-                <div style={{ fontSize: '11px', color: 'var(--txv)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {databases.find(d => d.db_key === selectedDb)?.db_name ?? selectedDb}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '9px', color: 'var(--tx3)', fontFamily: 'monospace', textTransform: 'uppercase', marginBottom: '3px' }}>Tablespace</div>
-                <div style={{ fontSize: '11px', color: 'var(--txv)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedTs}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '9px', color: 'var(--tx3)', fontFamily: 'monospace', textTransform: 'uppercase', marginBottom: '3px' }}>Latest Date</div>
-                <div style={{ fontSize: '11px', color: 'var(--txv)', fontFamily: 'monospace' }}>{latestDate}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '9px', color: 'var(--tx3)', fontFamily: 'monospace', textTransform: 'uppercase', marginBottom: '3px' }}>Data Points</div>
-                <div style={{ fontSize: '11px', color: 'var(--txv)', fontFamily: 'monospace' }}>{chartData.length}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '9px', color: 'var(--tx3)', fontFamily: 'monospace', textTransform: 'uppercase', marginBottom: '3px' }}>Status</div>
-                <span className="tg" style={{
-                  background: currentSeverity === 'critical' ? 'var(--crb)' : currentSeverity === 'warning' ? 'var(--wab)' : 'var(--hlb)',
-                  color: currentSeverity === 'critical' ? 'var(--cr)' : currentSeverity === 'warning' ? 'var(--wa)' : 'var(--hl)',
-                }}>
-                  {currentSeverity.toUpperCase()}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: '11px', color: 'var(--tx3)', fontFamily: 'monospace' }}>
-              Select a database and tablespace to view chart info
-            </div>
-          )}
-        </div>
-      </div>
+      {activeTab === 'overview' && <OverviewTab />}
+      {activeTab === 'deepdive' && (
+        <DeepDiveTab dark={dark} pending={pendingDeepDive} onConsumed={() => setPendingDeepDive(null)} />
+      )}
+      {activeTab === 'compare' && <CompareTab dark={dark} />}
+      {activeTab === 'forecast' && <ForecastTab />}
+      {activeTab === 'capacity' && <CapacityTab dark={dark} />}
+      {activeTab === 'watchlist' && <WatchlistTab onOpenDeepDive={openInDeepDive} />}
+      {activeTab === 'anomalies' && <AnomaliesTab />}
     </div>
   )
 }
