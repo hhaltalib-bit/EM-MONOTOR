@@ -23,6 +23,7 @@ interface ComputeResult {
   ok: boolean
   targetDate?: string
   tsMetricsWritten?: number
+  rowsWritten?: number
   anomaliesWritten?: number
   snapshotWritten?: boolean
   error?: string
@@ -267,10 +268,13 @@ export async function computeAndStoreMetrics(targetDate?: string): Promise<Compu
       if (error) throw new Error(error.message)
     }
 
+    const totalRowsUpserted = metricRows.length + anomalyRows.length + (metricRows.length > 0 ? 1 : 0)
+
     return {
       ok: true,
       targetDate: date,
       tsMetricsWritten: metricRows.length,
+      rowsWritten: totalRowsUpserted,
       anomaliesWritten: anomalyRows.length,
       snapshotWritten: metricRows.length > 0,
     }

@@ -10,6 +10,7 @@ import { ForecastTab } from '@/components/analytics/tabs/ForecastTab'
 import { CapacityTab } from '@/components/analytics/tabs/CapacityTab'
 import { WatchlistTab } from '@/components/analytics/tabs/WatchlistTab'
 import { AnomaliesTab } from '@/components/analytics/tabs/AnomaliesTab'
+import { BackfillPanel } from '@/components/analytics/BackfillPanel'
 
 export default function AnalyticsPage() {
   useEffect(() => { document.title = 'EM Monitor — Analytics' }, [])
@@ -38,6 +39,8 @@ export default function AnalyticsPage() {
       {activeTab === 'capacity' && <CapacityTab dark={dark} />}
       {activeTab === 'watchlist' && <WatchlistTab onOpenDeepDive={openInDeepDive} />}
       {activeTab === 'anomalies' && <AnomaliesTab />}
+
+      <BackfillPanel />
     </div>
   )
 }

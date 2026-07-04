@@ -4,33 +4,39 @@ import { rateLimit } from '@/lib/utils/rateLimit'
 import { requireAuth } from '@/lib/auth/requireAuth'
 import { writeAudit } from '@/lib/utils/auditLog'
 import { USER_LIST_LIMIT } from '@/lib/constants'
+import { logger } from '@/lib/utils/logger'
 
 export async function GET(_req: NextRequest) {
-  const auth = await requireAuth(true)
-  if (!auth.ok) return auth.response
+  try {
+    const auth = await requireAuth(true)
+    if (!auth.ok) return auth.response
 
-  const svc = createServiceClient()
-  const { data: authData, error } = await svc.auth.admin.listUsers({ perPage: USER_LIST_LIMIT })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const svc = createServiceClient()
+    const { data: authData, error } = await svc.auth.admin.listUsers({ perPage: USER_LIST_LIMIT })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profiles } = await (svc.from('user_profiles') as any).select('user_id, role, display_name, failed_attempts, locked_until')
-  const profileMap = new Map(((profiles ?? []) as Record<string, unknown>[]).map(p => [p.user_id as string, p]))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: profiles } = await (svc.from('user_profiles') as any).select('user_id, role, display_name, failed_attempts, locked_until')
+    const profileMap = new Map(((profiles ?? []) as Record<string, unknown>[]).map(p => [p.user_id as string, p]))
 
-  const users = authData.users.map(u => {
-    const p = profileMap.get(u.id) as Record<string, unknown> | undefined
-    return {
-      id: u.id,
-      email: u.email ?? '',
-      created_at: u.created_at,
-      role: p?.role ?? 'DBA',
-      display_name: p?.display_name ?? u.email?.split('@')[0] ?? '',
-      failed_attempts: (p?.failed_attempts as number) ?? 0,
-      locked_until: (p?.locked_until as string | null) ?? null,
-    }
-  })
+    const users = authData.users.map(u => {
+      const p = profileMap.get(u.id) as Record<string, unknown> | undefined
+      return {
+        id: u.id,
+        email: u.email ?? '',
+        created_at: u.created_at,
+        role: p?.role ?? 'DBA',
+        display_name: p?.display_name ?? u.email?.split('@')[0] ?? '',
+        failed_attempts: (p?.failed_attempts as number) ?? 0,
+        locked_until: (p?.locked_until as string | null) ?? null,
+      }
+    })
 
-  return NextResponse.json({ users, currentUserId: auth.user.id })
+    return NextResponse.json({ users, currentUserId: auth.user.id })
+  } catch (err) {
+    logger.error('admin-users', 'failed to load users', { err: String(err) })
+    return NextResponse.json({ error: 'Failed to load users' }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {

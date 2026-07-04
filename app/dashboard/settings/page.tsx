@@ -78,6 +78,8 @@ export default function SettingsPage() {
   // User management
   const [users, setUsers] = useState<UserEntry[]>([])
   const [usersLoading, setUsersLoading] = useState(true)
+  const [usersForbidden, setUsersForbidden] = useState(false)
+  const [usersError, setUsersError] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const [unlockLoading, setUnlockLoading] = useState<string | null>(null)
@@ -109,15 +111,25 @@ export default function SettingsPage() {
 
   async function loadUsers() {
     setUsersLoading(true)
+    setUsersForbidden(false)
+    setUsersError(null)
     try {
       const res = await fetch('/api/admin/users')
-      if (!res.ok) throw new Error('Failed to load users')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        if (res.status === 403) {
+          // Expected for non-Admin users — hide the section gracefully, no error.
+          setUsersForbidden(true)
+          return
+        }
+        throw new Error(err.error ?? `HTTP ${res.status}`)
+      }
       const { users: list, currentUserId: cid } = await res.json()
       setUsers(list ?? [])
       if (cid) setCurrentUserId(cid)
     } catch (err) {
       console.error('[settings-loadUsers] failed to load users:', err)
-      showMsg('Failed to load users', false)
+      setUsersError('Unable to load users — you may not have admin access')
     } finally {
       setUsersLoading(false)
     }
@@ -307,16 +319,28 @@ export default function SettingsPage() {
                 {userMsg.text}
               </span>
             )}
-            <button
-              onClick={() => setAddForm(f => ({ ...f, open: !f.open, error: '' }))}
-              style={{ background: 'var(--Gv)', color: '#080c14', border: 'none', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', fontSize: '11px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '5px' }}
-            >
-              <i className="ti ti-plus" style={{ fontSize: '12px' }} />
-              Add
-            </button>
+            {!usersForbidden && !usersError && (
+              <button
+                onClick={() => setAddForm(f => ({ ...f, open: !f.open, error: '' }))}
+                style={{ background: 'var(--Gv)', color: '#080c14', border: 'none', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', fontSize: '11px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '5px' }}
+              >
+                <i className="ti ti-plus" style={{ fontSize: '12px' }} />
+                Add
+              </button>
+            )}
           </div>
         </div>
 
+        {usersForbidden ? (
+          <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--tx3)', fontFamily: 'monospace', fontSize: '11px' }}>
+            You don&apos;t have admin access to manage team members.
+          </div>
+        ) : usersError ? (
+          <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--cr)', fontFamily: 'monospace', fontSize: '11px' }}>
+            {usersError}
+          </div>
+        ) : (
+        <>
         {/* Add user form */}
         {addForm.open && (
           <form onSubmit={handleAddUser} style={{ background: 'var(--bg4)', border: '0.5px solid var(--bdv)', borderRadius: '7px', padding: '14px', marginBottom: '14px' }}>
@@ -448,6 +472,8 @@ export default function SettingsPage() {
         <div style={{ marginTop: '12px', fontSize: '10px', color: 'var(--tx3)', fontFamily: 'monospace' }}>
           Run <code style={{ background: 'var(--bg4)', padding: '1px 4px', borderRadius: '3px' }}>migrations/create_user_profiles.sql</code> in Supabase SQL editor to enable roles.
         </div>
+        </>
+        )}
       </Panel>
     </div>
   )
