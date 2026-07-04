@@ -11,6 +11,9 @@ const ALLOWED_SYSTEM_TABLES = new Set<string>([
   'system_settings',
   'user_profiles',
   'audit_log',
+  'analytics_ts_metrics',
+  'analytics_daily_snapshot',
+  'analytics_anomalies',
 ])
 
 // All Oracle tablespace tables follow the naming convention *_ts.

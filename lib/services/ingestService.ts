@@ -199,6 +199,19 @@ export async function processIngest(
     }
   }
 
+  // Analytics metric computation — isolated, non-fatal. Tablespace ingest must
+  // never depend on or be affected by this step, so it runs last and any
+  // failure here is swallowed after the *_ts writes above have already
+  // completed successfully.
+  if (parsed.report_date && dbsProcessed > 0) {
+    try {
+      const { computeAndStoreMetrics } = await import('@/lib/analytics/computeMetrics')
+      await computeAndStoreMetrics(parsed.report_date)
+    } catch (err) {
+      logger.error('analytics', 'metric computation failed (non-fatal)', { err: String(err) })
+    }
+  }
+
   criticalDbs.sort((a, b) => b.pct - a.pct)
   warningDbs.sort((a, b) => b.pct - a.pct)
 
